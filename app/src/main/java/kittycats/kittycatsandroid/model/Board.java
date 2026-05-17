@@ -4,9 +4,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Represents the 3x3 game board.
+ * <p>
+ * The center field is always white and is used as the draw pile position.
+ * All other fields can hold one card.
+ *
+ * @author JellyMae
+ */
 public class Board {
 
     private final Field[][] fields;
+
 
 
     // --- Constructors ---
@@ -17,8 +26,17 @@ public class Board {
     }
 
 
+
     // --- Getters and Setters ---
 
+    /**
+     * Returns the field at the given board position.
+     *
+     * @param row the row of the field
+     * @param column the column of the field
+     * @return the field at the given position
+     * @throws IllegalArgumentException if the position is outside the board
+     */
     public Field getField(int row, int column) {
         if((row < 0 || row > 2) || (column < 0 || column > 2)) {
             throw new IllegalArgumentException("position is not on the board");
@@ -31,6 +49,13 @@ public class Board {
         return row == 1 && column == 1;
     }
 
+    /**
+     * Checks whether all playable fields on the board are occupied.
+     * <p>
+     * The center field is ignored because it is reserved as the draw position.
+     *
+     * @return {@code true} if all playable fields are occupied, otherwise {@code false}
+     */
     public boolean isFull() {
         for(int row = 0; row < 3; row++) {
             for(int column = 0; column < 3; column++) {
@@ -43,10 +68,11 @@ public class Board {
     }
 
 
+
     // --- Operations ---
 
     private void initializeFields() {
-        List<FieldColor> fieldColors = randomizeFieldColors();
+        List<GameColor> fieldColors = randomizeFieldColors();
         Collections.shuffle(fieldColors);
 
         int index = 0;
@@ -54,7 +80,7 @@ public class Board {
         for(int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
                 if(isCenterField(row, column)) {
-                    fields[1][1] = new Field(FieldColor.WHITE, row, column);
+                    fields[1][1] = new Field(GameColor.WHITE, row, column);
                     continue;
                 }
 
@@ -64,17 +90,17 @@ public class Board {
         }
     }
 
-    private List<FieldColor> randomizeFieldColors() {
-        List<FieldColor> fieldColors = new ArrayList<>();
-        List<FieldColor> coloredFields = new ArrayList<>();
+    private List<GameColor> randomizeFieldColors() {
+        List<GameColor> fieldColors = new ArrayList<>();
+        List<GameColor> coloredFields = new ArrayList<>();
 
-        coloredFields.add(FieldColor.RED);
-        coloredFields.add(FieldColor.YELLOW);
-        coloredFields.add(FieldColor.GREEN);
-        coloredFields.add(FieldColor.BLUE);
+        coloredFields.add(GameColor.RED);
+        coloredFields.add(GameColor.YELLOW);
+        coloredFields.add(GameColor.GREEN);
+        coloredFields.add(GameColor.BLUE);
 
         for(int i = 0; i < 4; i++) {
-            fieldColors.add(FieldColor.WHITE);
+            fieldColors.add(GameColor.WHITE);
             fieldColors.add(coloredFields.get((int)(Math.random() * coloredFields.size())));
         }
 
@@ -88,5 +114,4 @@ public class Board {
             }
         }
     }
-
 }

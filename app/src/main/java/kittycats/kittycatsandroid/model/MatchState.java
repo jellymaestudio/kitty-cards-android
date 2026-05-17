@@ -8,12 +8,14 @@ public class MatchState {
     private Player matchWinner;
 
 
+
     // --- Constructors ---
 
     public MatchState() {
         this.currentRound = 1;
         this.matchWinner = null;
     }
+
 
 
     // --- Getters and Setters ---
@@ -35,6 +37,7 @@ public class MatchState {
     }
 
 
+
     // --- Operations ---
 
     public void nextRound() {
@@ -49,13 +52,10 @@ public class MatchState {
             return true;
         }
         if(playerTwo.getWins() >= WINS_NEEDED) {
-            matchWinner = playerOne;
+            matchWinner = playerTwo;
             return true;
         }
 
         return currentRound >= MAX_ROUNDS;
     }
-
-
-
 }
