@@ -3,13 +3,23 @@ package kittycats.kittycatsandroid.model;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents a player in the match.
+ * <p>
+ * A player has an id, a name, hand cards, a selected card, a score for the
+ * current round and wins for the current match.
+ *
+ * @author JellyMae
+ */
 public class Player {
 
     private final int id;
     private final String name;
     private final List<Card> handCards;
+    private Card selectedCard;
     private int score;
     private int wins;
+
 
 
     // --- Constructors ---
@@ -22,9 +32,11 @@ public class Player {
         this.id = id;
         this.name = name;
         this.handCards = new ArrayList<>(); //Maybe a different list?
+        this.selectedCard = null;
         this.score = 0;
         this.wins = 0;
     }
+
 
 
     // --- Getters and Setters ---
@@ -33,13 +45,44 @@ public class Player {
         return handCards;
     }
 
+    public Card getSelectedCard() {
+        return selectedCard;
+    }
+
+    /**
+     * Sets the selected card of the player.
+     * <p>
+     * A {@code null} value unselects the current card.
+     *
+     * @param selectedCard the selected card
+     */
+    public void setSelectedCard(Card selectedCard) {
+        this.selectedCard = selectedCard;
+    }
+
+
+    /**
+     * Returns the current score of the player.
+     *
+     * @return the player's current score
+     */
+    public int getScore() {
+        return score;
+    }
+
     public int getWins() {
         return wins;
     }
 
+
     public boolean hasCard(Card card) {
         return handCards.contains(card);
     }
+
+    public boolean hasSelectedCard() {
+        return selectedCard != null;
+    }
+
 
 
     // --- Operations ---
@@ -58,6 +101,29 @@ public class Player {
         }
 
         handCards.remove(card);
+
+        if(card.equals(selectedCard)) {
+            unselectCard();
+        }
+    }
+
+    public void selectCard(Card card) {
+        if(card == null) {
+            throw new NullPointerException("card cannot be null");
+        }
+        if (!handCards.contains(card)) {
+            throw new IllegalArgumentException("player does not have this card");
+        }
+
+        this.selectedCard = card;
+    }
+
+    public void unselectCard() {
+        this.selectedCard = null;
+    }
+
+    public void clearHandCards() {
+        handCards.clear();
     }
 
 
@@ -79,7 +145,15 @@ public class Player {
     }
 
 
-    public void clearHandCards() {
-        handCards.clear();
+    /**
+     * Resets all round-specific player data.
+     * <p>
+     * This includes score, hand cards and selected card.
+     * Match-specific data such as id, name and wins remain unchanged.
+     */
+    public void reset() {
+        resetScore();
+        clearHandCards();
+        unselectCard();
     }
 }
