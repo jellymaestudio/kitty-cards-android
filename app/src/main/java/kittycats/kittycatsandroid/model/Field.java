@@ -1,23 +1,24 @@
 package kittycats.kittycatsandroid.model;
 
 /**
- * Represents a Field with one of the five colors of {@link FieldColor} and
+ * Represents a Field with one of the five colors of {@link GameColor} and
  * a position on the {@link Board}.
  *
  * @author JellyMae
  */
 public class Field {
 
-    private final FieldColor color;
+    private final GameColor color;
     private final int row;
     private final int column;
     private Card card;
 
 
+
     // --- Constructors ---
 
     /**
-     * Creates a Field with one of the five colors of @link FieldColor} and a position on the {@link Board}.
+     * Creates a Field with one of the five colors of {@link GameColor} and a position on the {@link Board}.
      *
      * @param color the color of the field
      * @param column the column of the field on the board
@@ -25,7 +26,7 @@ public class Field {
      * @throws NullPointerException if {@code color} is {@code null}
      * @throws IllegalArgumentException if {@code column} or {@code row} is not between 0 and 2
      */
-    public Field(FieldColor color, int row, int column) {
+    public Field(GameColor color, int row, int column) {
         if(color == null) {
             throw new NullPointerException("color cannot be null");
         }
@@ -40,6 +41,7 @@ public class Field {
     }
 
 
+
     // --- Getters and Setters ---
 
     /**
@@ -47,7 +49,7 @@ public class Field {
      *
      * @return the color of the Field
      */
-    public FieldColor getColor() {
+    public GameColor getColor() {
         return color;
     }
 
@@ -71,6 +73,7 @@ public class Field {
     public boolean isEmpty() {
         return card == null;
     }
+
 
 
     // --- Operations ---
