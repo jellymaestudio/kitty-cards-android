@@ -11,7 +11,9 @@ public interface INetworkManager {
 
     void selectRoom();
 
-    void getInputStream();
-
-    void getOutputStream();
+    /**
+     * Closes the active Network connection to the remote device.
+     * Should be called when the match ends or a player disconnects.
+     */
+    void disconnect();
 }

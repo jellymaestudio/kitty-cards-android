@@ -10,6 +10,4 @@ public interface IGameController {
 
     void playCard();
 
-    void leaveGame();
-
 }
