@@ -1,54 +1,42 @@
 package kittycats.kittycatsandroid.components;
 
+import java.util.ArrayList;
+
+import kittycats.kittycatsandroid.network.GameAction;
 import kittycats.kittycatsandroid.network.NetworkDevice;
 
 /**
  * Handles all network-related tasks, particularly establishing the connection between Guest and the Host
  * <p>
- * All methods trigger asynchronous operations. Results and state changes
- * are communicated back via the registered {@link INetworkListener}.
- * <p>
  * Implementations of this interface are expected to be singletons.
+ *
+ * @author red_concrete
  */
 public interface INetworkManager {
-    /**
-     * Registers a listener to receive asynchronous network events.
-     * Should be called before any other method.
-     *
-     * @param listener The listener to be notified of network events.
-     */
-    void setListener(INetworkListener listener);
 
     /**
      * To be called when the host wishes to open a Room for a new match.
      * Handles Network permissions and the advertisement to other mobile phones
-     * <p>
-     * Results are reported via {@link INetworkListener#onDeviceFound(NetworkDevice)}.
+     *
+     * @return a continuously updating list of found NetworkDevices willing to join the match
      */
-    void hostMatch();
+    ArrayList<NetworkDevice> hostMatch();
 
     /**
      * To be called when the guest wishes to join a match.
      * Handles Network permissions and searches for hosted matches advertised by other phones
-     * <p>
-     * Discovered rooms are reported via {@link INetworkListener#onDeviceFound(NetworkDevice)}.
+     *
+     * @return a continuously updating list of found NetworkDevices offering a game to join
      */
-    void joinMatch();
+    ArrayList<NetworkDevice> joinMatch();
 
     /**
-     * To be called when the guest wishes to select an advertised match he wants to join.
-     * <p>
-     * A successful connection is reported via {@link INetworkListener#onConnected(NetworkDevice)}.
-     */
-    void selectRoom(NetworkDevice room);
-
-    /**
-     * Should be called to confirm that the guest wishes to start the match with the selected player.
+     * Should be called when the guest wishes to confirm and connect to the selected player.
      * Establishes a connection between this device and the Hostmatch mobile phone.
-     * <p>
-     * Requires a prior call to {@link #selectRoom(NetworkDevice)}.
+     *
+     * @param room the host device the player wants to join to
      */
-    void confirmRoom();
+    void confirmRoom(NetworkDevice room);
 
     /**
      * To be called when the host wishes to select a guest (that has asked to join the Room) he wants to play with.
@@ -58,12 +46,16 @@ public interface INetworkManager {
     void selectGuest(NetworkDevice guest);
 
     /**
-     * Once a match has been hosted, another device has joined and successfully connected,
-     * this method should be called when the host wishes to confirm that they want to start the game with the connected player.
-     * Initiates the creation of the match board.
-     * <p>
-     * Requires an active connection established via {@link INetworkListener#onConnected(NetworkDevice)}.
+     * Closes the active Network connection to the remote device.
+     * Should be called when the match ends or a player disconnects.
      */
-    void startMatch();
+    void disconnect();
+
+    /**
+     * Sends raw data to the connected remote device.
+     *
+     * @param action The raw byte array to be transmitted.
+     */
+    void sendGameChange(GameAction action);
 
 }
