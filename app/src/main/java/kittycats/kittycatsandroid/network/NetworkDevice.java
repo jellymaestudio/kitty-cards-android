@@ -1,5 +1,9 @@
 package kittycats.kittycatsandroid.network;
 
+/**
+ *
+ * @author red_concrete
+ */
 public class NetworkDevice {
 
     private final String deviceName;
