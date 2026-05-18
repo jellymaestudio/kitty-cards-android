@@ -25,7 +25,7 @@ public class GameState {
      * @throws NullPointerException if one of the players is {@code null}
      */
     public GameState(Player startingPlayer, Player secondPlayer) {
-        if(startingPlayer == null || secondPlayer == null) {
+        if (startingPlayer == null || secondPlayer == null) {
             throw new NullPointerException("players cannot be null");
         }
 
@@ -76,8 +76,17 @@ public class GameState {
      * Sets the current active player.
      *
      * @param currentPlayer the new current player
+     * @throws NullPointerException if {@code currentPlayer} is {@code null}
+     * @throws IllegalArgumentException if {@code currentPlayer} is not part of this match
      */
     public void setCurrentPlayer(Player currentPlayer) {
+        if (currentPlayer == null) {
+            throw new NullPointerException("current player cannot be null");
+        }
+        if (currentPlayer != startingPlayer || currentPlayer != secondPlayer) {
+            throw new IllegalArgumentException("player is not part of this match");
+        }
+
         this.currentPlayer = currentPlayer;
     }
 

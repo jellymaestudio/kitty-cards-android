@@ -68,9 +68,13 @@ public class Match {
      *
      * @param player the reference player
      * @return the other player in the match
+     * @throws NullPointerException if {@code player} is {@code null}
      * @throws IllegalArgumentException if {@code player} is not part of this match
      */
     public Player getOtherPlayer(Player player) {
+        if(player == null) {
+            throw new NullPointerException("player cannot be null");
+        }
         if (player != playerOne && player != playerTwo) {
             throw new IllegalArgumentException("player is not part of this match");
         }

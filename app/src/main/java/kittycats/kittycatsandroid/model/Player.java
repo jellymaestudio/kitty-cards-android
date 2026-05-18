@@ -48,6 +48,24 @@ public class Player {
     // --- Getters and Setters ---
 
     /**
+     * Returns the player's id.
+     *
+     * @return the player's id
+     */
+    public int getId() {
+        return id;
+    }
+
+    /**
+     * Returns the player's name.
+     *
+     * @return the player's name
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
      * Returns all cards currently in the player's hand.
      *
      * @return the player's hand cards
