@@ -1,7 +1,13 @@
 package kittycats.kittycatsandroid.model;
 
 /**
- * Enum for the current status of the match.
+ * Represents the current status of a match.
+ * <p>
+ * RUNNING: The match is currently active. <br>
+ * PAUSED: The match is temporarily paused. <br>
+ * FINISHED: The match has ended. <br>
+ * WAITING_FOR_NETWORK: The match is waiting for network communication.
+ * </p>
  *
  * @author JellyMae
  */

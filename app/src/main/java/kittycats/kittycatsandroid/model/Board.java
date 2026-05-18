@@ -7,8 +7,10 @@ import java.util.List;
 /**
  * Represents the 3x3 game board.
  * <p>
- * The center field is always white and is used as the draw pile position.
- * All other fields can hold one card.
+ * The board consists of nine fields arranged in a grid.
+ * The center field is always white and serves as the draw pile position.
+ * All other fields are randomized at board creation and can hold one placed card.
+ * </p>
  *
  * @author JellyMae
  */
@@ -17,34 +19,46 @@ public class Board {
     private final Field[][] fields;
 
 
+    // --- Constructor ---
 
-    // --- Constructors ---
-
+    /**
+     * Creates a new game board and initializes all fields.
+     * <p>
+     * Field colors are randomized, except for the center field,
+     * which is always white.
+     * </p>
+     */
     public Board() {
         fields = new Field[3][3];
         initializeFields();
     }
 
 
-
-    // --- Getters and Setters ---
+    // --- Getters ---
 
     /**
      * Returns the field at the given board position.
      *
-     * @param row the row of the field
+     * @param row    the row of the field
      * @param column the column of the field
      * @return the field at the given position
      * @throws IllegalArgumentException if the position is outside the board
      */
     public Field getField(int row, int column) {
-        if((row < 0 || row > 2) || (column < 0 || column > 2)) {
+        if ((row < 0 || row > 2) || (column < 0 || column > 2)) {
             throw new IllegalArgumentException("position is not on the board");
         }
 
         return fields[row][column];
     }
 
+    /**
+     * Checks whether the given position is the center field.
+     *
+     * @param row    the row to check
+     * @param column the column to check
+     * @return {@code true} if the position is the center field, otherwise {@code false}
+     */
     public boolean isCenterField(int row, int column) {
         return row == 1 && column == 1;
     }
@@ -57,9 +71,9 @@ public class Board {
      * @return {@code true} if all playable fields are occupied, otherwise {@code false}
      */
     public boolean isFull() {
-        for(int row = 0; row < 3; row++) {
-            for(int column = 0; column < 3; column++) {
-                if(!isCenterField(row, column) && fields[row][column].isEmpty()) {
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                if (!isCenterField(row, column) && fields[row][column].isEmpty()) {
                     return false;
                 }
             }
@@ -68,8 +82,7 @@ public class Board {
     }
 
 
-
-    // --- Operations ---
+    // --- Board Management ---
 
     private void initializeFields() {
         List<GameColor> fieldColors = randomizeFieldColors();
@@ -77,14 +90,14 @@ public class Board {
 
         int index = 0;
 
-        for(int row = 0; row < 3; row++) {
+        for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
-                if(isCenterField(row, column)) {
+                if (isCenterField(row, column)) {
                     fields[1][1] = new Field(GameColor.WHITE, row, column);
                     continue;
                 }
 
-                fields[row][column] = new Field(fieldColors.get(index),  row, column);
+                fields[row][column] = new Field(fieldColors.get(index), row, column);
                 index++;
             }
         }
@@ -99,17 +112,24 @@ public class Board {
         coloredFields.add(GameColor.GREEN);
         coloredFields.add(GameColor.BLUE);
 
-        for(int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; i++) {
             fieldColors.add(GameColor.WHITE);
-            fieldColors.add(coloredFields.get((int)(Math.random() * coloredFields.size())));
+            fieldColors.add(coloredFields.get((int) (Math.random() * coloredFields.size())));
         }
 
         return fieldColors;
     }
 
+    /**
+     * Clears all cards from the board.
+     * <p>
+     * Field colors and positions remain unchanged.
+     * Only placed cards are removed.
+     * </p>
+     */
     public void clearBoard() {
-        for(int row = 0; row < 3; row++) {
-            for(int column = 0; column < 3; column++) {
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
                 fields[row][column].clearField();
             }
         }

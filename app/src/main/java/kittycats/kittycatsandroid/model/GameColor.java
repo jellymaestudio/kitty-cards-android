@@ -1,10 +1,11 @@
 package kittycats.kittycatsandroid.model;
 
 /**
- * Represents the colors used in the game.
+ * Represents all colors used in the game.
  * <p>
- * Red, yellow, green and blue can be used for cards and fields.
- * White can only be used for fields.
+ * The colors red, yellow, green, and blue can be used for both cards and fields.
+ * White is reserved exclusively for board fields, such as neutral or draw pile fields.
+ * </p>
  *
  * @author JellyMae
  */
@@ -19,15 +20,16 @@ public enum GameColor {
     private final String hexCode;
 
 
-    // --- Constructor ---
-
     GameColor(String hexCode) {
         this.hexCode = hexCode;
     }
 
 
-    // --- Getters ---
-
+    /**
+     * Returns the hexadecimal color code of this game color.
+     *
+     * @return the hex code of this color
+     */
     public String getHexCode() {
         return hexCode;
     }
