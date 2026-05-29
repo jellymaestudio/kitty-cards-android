@@ -37,6 +37,11 @@ public class GameController implements IGameController {
 
     }
 
+    @Override
+    public void setOnStateChangedListener(Runnable listener) {
+        //Das ist basically ein setter
+    }
+
     public static GameController getInstance() {
         if (INSTANCE == null) INSTANCE = new GameController();
         return INSTANCE;

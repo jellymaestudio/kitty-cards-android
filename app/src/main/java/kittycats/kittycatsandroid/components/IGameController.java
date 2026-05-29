@@ -21,6 +21,7 @@ public interface IGameController {
      * Should be called when the guest device has been connected, to initiate the Match and the GameBoard
      */
     void startMatch();
+
     /**
      * Draws a card from the game pile and adds it to the currentPlayer's hand.
      * Ends the turn.
@@ -32,8 +33,9 @@ public interface IGameController {
      * Marks a card in hand of player as selected.
      * A selected card can subsequently be played via {@link #playCard(int, int)}.
      * The selected card must be transmitted to the remote device.
+     *
      * @param player the Player who selects the card
-     * @param card the card to be selected
+     * @param card   the card to be selected
      */
     void selectCard(Player player, Card card);
 
@@ -41,6 +43,7 @@ public interface IGameController {
      * Unselects the currently selected card.
      * Has no effect if no card is currently selected.
      * The unselection must be transmitted to the remote device.
+     *
      * @param player the Player
      */
     void unselectCard(Player player);
@@ -49,10 +52,18 @@ public interface IGameController {
      * Places the currently selected card of the currentPlayer onto the board at (row, column).
      * Requires a card to be selected by the currentPlayer via {@link #selectCard(Player, Card)} )} beforehand.
      * The action must be transmitted to the remote device.
-     * @param row the row of the field onto which the card is placed.
+     *
+     * @param row    the row of the field onto which the card is placed.
      * @param column the column of the field onto which the card is placed.
      */
     void playCard(int row, int column);
+
+    /**
+     * Registers a listener that is called whenever the game state or match status changes.
+     *
+     * @param listener the listener that gets called
+     */
+    void setOnStateChangedListener(Runnable listener);
 
 
 }

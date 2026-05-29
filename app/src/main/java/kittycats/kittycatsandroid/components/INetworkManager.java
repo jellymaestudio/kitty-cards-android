@@ -58,4 +58,15 @@ public interface INetworkManager {
      */
     void sendGameChange(GameAction action);
 
+    /**
+     * Retrieves the next game action received from the remote device.
+     * Pauses until an action becomes available.
+     *
+     * @return the retrieved GameAction object
+     * @throws InterruptedException If the blocked thread is interrupted from outside
+     *                              (e.g. due to the app being closed or a loss of connection),
+     *                              in order to end the wait prematurely.
+     */
+    GameAction fetchNextAction() throws InterruptedException;
+
 }
