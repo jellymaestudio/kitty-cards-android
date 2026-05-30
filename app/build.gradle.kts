@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "kittycats.kittycatsandroid"
+    namespace = "kittycards.kittycardsandroid"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "kittycats.kittycatsandroid"
+        applicationId = "kittycards.kittycardsandroid"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

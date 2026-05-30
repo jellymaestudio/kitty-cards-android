@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Kitty Cats Android"
+rootProject.name = "Kitty Cards Android"
 include(":app")
  
