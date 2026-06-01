@@ -8,6 +8,8 @@ appcompat = "1.7.1"
 material = "1.13.0"
 activityKtx = "1.13.0"
 constraintlayout = "2.1.4"
+junitBom      = "5.14.1"
+androidJunit  = "2.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -18,7 +20,12 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+junit-bom             = { group = "org.junit", name = "junit-bom", version.ref = "junitBom" }
+junit-jupiter-api     = { group = "org.junit.jupiter", name = "junit-jupiter-api" }      # Version via BOM
+junit-jupiter-params  = { group = "org.junit.jupiter", name = "junit-jupiter-params" }   # Version via BOM
+junit-jupiter-engine  = { group = "org.junit.jupiter", name = "junit-jupiter-engine" }   # Version via BOM
+junit-vintage-engine  = { group = "org.junit.vintage", name = "junit-vintage-engine" }   # Version via BOM
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-
+android-junit = { id = "de.mannodermaus.android-junit", version.ref = "androidJunit" }

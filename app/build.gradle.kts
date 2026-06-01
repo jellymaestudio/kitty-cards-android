@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.android.junit)
 }
 
 android {
@@ -41,7 +42,14 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
-    testImplementation(libs.junit)
+
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
+
+    testImplementation(platform(libs.junit.bom))        // BOM zieht alle Versionen rein
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+
+    testImplementation(libs.junit)                      // JUnit 4 bleibt
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
