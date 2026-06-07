@@ -74,6 +74,10 @@ public class Player {
         return handCards;
     }
 
+    public int getHandCardCount() {
+        return handCards.size();
+    }
+
     /**
      * Returns the currently selected card.
      *
@@ -95,24 +99,6 @@ public class Player {
     }
 
     /**
-     * Returns the current score of the player.
-     *
-     * @return the player's current score
-     */
-    public int getScore() {
-        return score;
-    }
-
-    /**
-     * Returns the number of match wins of this player.
-     *
-     * @return the player's total wins
-     */
-    public int getWins() {
-        return wins;
-    }
-
-    /**
      * Checks whether the player currently owns the given card.
      *
      * @param card the card to check
@@ -129,6 +115,24 @@ public class Player {
      */
     public boolean hasSelectedCard() {
         return selectedCard != null;
+    }
+
+    /**
+     * Returns the current score of the player.
+     *
+     * @return the player's current score
+     */
+    public int getScore() {
+        return score;
+    }
+
+    /**
+     * Returns the number of match wins of this player.
+     *
+     * @return the player's total wins
+     */
+    public int getWins() {
+        return wins;
     }
 
 

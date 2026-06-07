@@ -37,6 +37,17 @@ public class Board {
     // --- Getters ---
 
     /**
+     * Checks whether the given position is on the board.
+     *
+     * @param row    the row to check
+     * @param column the column to check
+     * @return {@code true} if the position is on the board, otherwise {@code false}
+     */
+    public boolean isOnBoard(int row, int column) {
+        return (row >= 0 && row <= 2) && (column >= 0 && column <= 2);
+    }
+
+    /**
      * Returns the field at the given board position.
      *
      * @param row    the row of the field
@@ -45,7 +56,7 @@ public class Board {
      * @throws IllegalArgumentException if the position is outside the board
      */
     public Field getField(int row, int column) {
-        if ((row < 0 || row > 2) || (column < 0 || column > 2)) {
+        if (!isOnBoard(row, column)) {
             throw new IllegalArgumentException("position is not on the board");
         }
 
