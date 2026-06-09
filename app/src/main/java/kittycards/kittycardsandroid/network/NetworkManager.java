@@ -212,7 +212,11 @@ public class NetworkManager implements INetworkManager {
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void confirmRoom(NetworkDevice room) {
-        // TODO: Connect to the selected host (connectGatt)
+        if (bluetoothAdapter == null) return;
+        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(room.deviceAddress());
+        stopScan();
+        activeGattConnection = device.connectGatt(context, false, gattCallback);
+        // TODO: Connect to the selected host (connectGatt). Fertig?
     }
 
     @Override
