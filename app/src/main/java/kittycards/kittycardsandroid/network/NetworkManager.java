@@ -1,16 +1,27 @@
 package kittycards.kittycardsandroid.network;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+
+import androidx.annotation.RequiresApi;
+import androidx.annotation.RequiresPermission;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -111,7 +122,8 @@ public class NetworkManager implements INetworkManager {
         }
     }
 
-    @SuppressLint("MissingPermission") // Permission is checked in the activity
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private void stopScan() {
         if (bluetoothAdapter == null) return;
 
@@ -128,7 +140,7 @@ public class NetworkManager implements INetworkManager {
     // -------------------------------------------------------------------------
 
     // BLE background thread calls this when data arrives
-    private void onBytesReceived(byte[] bytes) throws InterruptedException {
+    private void decodeAndQueueData(byte[] bytes) throws InterruptedException {
         GameAction action = protocolEngine.decode(bytes);
         actionQueue.put(action);
     }
@@ -143,12 +155,14 @@ public class NetworkManager implements INetworkManager {
         return foundRooms;
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     @Override
     public ArrayList<NetworkDevice> joinMatch() {
         startScan();
         return foundRooms;
     }
 
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void confirmRoom(NetworkDevice room) {
         // TODO: Connect to the selected host (connectGatt)
@@ -159,6 +173,7 @@ public class NetworkManager implements INetworkManager {
         // TODO: Accept the selected guest, (disconnect the others?)
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     @Override
     public void disconnect() {
         stopScan();
@@ -166,9 +181,15 @@ public class NetworkManager implements INetworkManager {
         // TODO: Disconnect active GATT connection
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void sendGameChange(GameAction action) {
-        // TODO: Encode the action using ProtocolEngine and send it via GATT
+        activeGattConnection.writeCharacteristic(
+                gattCharacteristic,
+                protocolEngine.encode(action),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        );
     }
 
     @Override
