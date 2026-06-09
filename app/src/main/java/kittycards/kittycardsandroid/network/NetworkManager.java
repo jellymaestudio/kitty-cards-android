@@ -40,6 +40,8 @@ public class NetworkManager implements INetworkManager {
 
     private static final UUID KITTY_CARDS_SERVICE_UUID =
             UUID.fromString("0aac93ed-aff4-4ef0-85ef-019c11b3e434");//from: https://www.uuidgenerator.net/
+    private static final UUID KITTY_CARDS_CHARACTERISTIC_UUID =
+            UUID.fromString("f4439cae-c811-418e-b314-c7258d85710c");//from: https://www.uuidgenerator.net/
 
     private static final long SCAN_PERIOD = 10000;
 
@@ -52,30 +54,9 @@ public class NetworkManager implements INetworkManager {
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
 
     private final ArrayList<NetworkDevice> foundRooms = new ArrayList<>();
+    private BluetoothGatt activeGattConnection;
+    private BluetoothGattCharacteristic gattCharacteristic;
     private boolean scanning = false;
-
-    // -------------------------------------------------------------------------
-    // Singleton
-    // -------------------------------------------------------------------------
-
-    private NetworkManager(Context context) {
-        this.context = context.getApplicationContext();
-        this.protocolEngine = new ProtocolEngine();
-        BluetoothManager bluetoothManager =
-                (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
-        this.bluetoothAdapter = bluetoothManager.getAdapter();
-    }
-
-    public static NetworkManager getInstance(Context context) {
-        if (instance == null) {
-            synchronized (NetworkManager.class) {
-                if (instance == null) {
-                    instance = new NetworkManager(context);
-                }
-            }
-        }
-        return instance;
-    }
 
     // -------------------------------------------------------------------------
     // Scan
@@ -100,7 +81,73 @@ public class NetworkManager implements INetworkManager {
         }
     };
 
-    @SuppressLint("MissingPermission") // Permission wird in der Activity geprüft
+    private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                gatt.discoverServices();    //"Discover" the services offered by the remote device (calls onServicesDiscovered() when done)
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                // TODO: Dealing with a loss of connection
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            BluetoothGattService service = gatt.getService(KITTY_CARDS_SERVICE_UUID);
+            if (service == null) return; // TODO: Fehler behandeln
+            gattCharacteristic = service.getCharacteristic(KITTY_CARDS_CHARACTERISTIC_UUID);
+            // TODO: activate Notifications
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
+            try {
+                decodeAndQueueData(value); //
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt,
+                                          BluetoothGattCharacteristic characteristic, int status) {
+            // TODO: Confirmation that sendGameChange() has been received?
+        }
+    };
+
+    // -------------------------------------------------------------------------
+    // Singleton
+    // -------------------------------------------------------------------------
+
+    private NetworkManager(Context context) {
+        this.context = context.getApplicationContext();
+        this.protocolEngine = new ProtocolEngine();
+        BluetoothManager bluetoothManager =
+                (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
+        this.bluetoothAdapter = bluetoothManager.getAdapter();
+    }
+
+    public static NetworkManager getInstance(Context context) {
+        if (instance == null) {
+            synchronized (NetworkManager.class) {
+                if (instance == null) {
+                    instance = new NetworkManager(context);
+                }
+            }
+        }
+        return instance;
+    }
+
+    public static NetworkManager getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("NetworkManager not initialized. Call getInstance(Context) first.");
+        }
+        return instance;
+    }
+
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private void startScan() {
         if (bluetoothAdapter == null) return;
 
