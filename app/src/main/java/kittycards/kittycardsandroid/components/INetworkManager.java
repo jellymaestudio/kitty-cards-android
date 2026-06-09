@@ -1,9 +1,9 @@
 package kittycards.kittycardsandroid.components;
 
-import java.util.ArrayList;
-
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
+import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
+import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
 
 /**
  * Handles all network-related tasks, particularly establishing the connection between Guest and the Host
@@ -21,9 +21,9 @@ public interface INetworkManager {
      * Requires {@link android.Manifest.permission#BLUETOOTH_ADVERTISE} to be granted
      * before calling this method.
      *
-     * @return a list of network devices that are ready to join the match; will be updated for 10 seconds after being called.
+     * @param listener The callback to be invoked when a guest successfully connects to this host.
      */
-    ArrayList<NetworkDevice> hostMatch();
+    void hostMatch(OnGuestConnectedListener listener);
 
     /**
      * To be called when the guest wishes to join a match.
@@ -32,9 +32,11 @@ public interface INetworkManager {
      * Requires {@link android.Manifest.permission#BLUETOOTH_SCAN} to be granted
      * before calling this method.
      *
-     * @return a list of network devices offering a game to join; will be updated for 10 seconds after being called.
+     * @param listener The callback to be invoked when network devices offering a game are discovered.
+     *                 The listener will be called multiple times as devices are found, for up to 10 seconds
+     *                 after this method is called.
      */
-    ArrayList<NetworkDevice> joinMatch();
+    void joinMatch(OnDeviceFoundListener listener);
 
     /**
      * Should be called when the guest wishes to confirm and connect to the selected player.
