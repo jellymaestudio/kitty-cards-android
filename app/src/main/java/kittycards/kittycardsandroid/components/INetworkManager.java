@@ -16,17 +16,23 @@ public interface INetworkManager {
 
     /**
      * To be called when the host wishes to open a Room for a new match.
-     * Handles Network permissions and the advertisement to other mobile phones
+     * Starts BLE advertising to make this device discoverable to potential guests.
+     * <p>
+     * Requires {@link android.Manifest.permission#BLUETOOTH_ADVERTISE} to be granted
+     * before calling this method.
      *
-     * @return a continuously updating list of found NetworkDevices willing to join the match
+     * @return a list of network devices that are ready to join the match; will be updated for 10 seconds after being called.
      */
     ArrayList<NetworkDevice> hostMatch();
 
     /**
      * To be called when the guest wishes to join a match.
-     * Handles Network permissions and searches for hosted matches advertised by other phones
+     * Scans for hosted matches advertised by other devices.
+     * <p>
+     * Requires {@link android.Manifest.permission#BLUETOOTH_SCAN} to be granted
+     * before calling this method.
      *
-     * @return a continuously updating list of found NetworkDevices offering a game to join
+     * @return a list of network devices offering a game to join; will be updated for 10 seconds after being called.
      */
     ArrayList<NetworkDevice> joinMatch();
 

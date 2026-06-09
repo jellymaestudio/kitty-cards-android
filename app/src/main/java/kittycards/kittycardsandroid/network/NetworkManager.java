@@ -20,7 +20,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
 
-import androidx.annotation.RequiresApi;
 import androidx.annotation.RequiresPermission;
 
 import java.util.ArrayList;
@@ -100,10 +99,21 @@ public class NetworkManager implements INetworkManager {
             // TODO: activate Notifications
         }
 
+        // API 33+
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
+            handleIncomingData(value);
+        }
+
+        // API 31–32
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            handleIncomingData(characteristic.getValue());
+        }
+
+        private void handleIncomingData(byte[] value) {
             try {
-                decodeAndQueueData(value); //
+                decodeAndQueueData(value);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -188,7 +198,7 @@ public class NetworkManager implements INetworkManager {
 
     // BLE background thread calls this when data arrives
     private void decodeAndQueueData(byte[] bytes) throws InterruptedException {
-        GameAction action = protocolEngine.decode(bytes);
+        GameAction action = protocolEngine.decodeGameAction(bytes);
         actionQueue.put(action);
     }
 
@@ -216,7 +226,6 @@ public class NetworkManager implements INetworkManager {
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(room.deviceAddress());
         stopScan();
         activeGattConnection = device.connectGatt(context, false, gattCallback);
-        // TODO: Connect to the selected host (connectGatt). Fertig?
     }
 
     @Override
@@ -224,23 +233,34 @@ public class NetworkManager implements INetworkManager {
         // TODO: Accept the selected guest, (disconnect the others?)
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void disconnect() {
         stopScan();
         handler.removeCallbacksAndMessages(null);
-        // TODO: Disconnect active GATT connection
+
+        activeGattConnection.disconnect(); // TODO: Disconnect active GATT connection. Fertig?
+        //TODO: was sonst noch? activeGattConnection = null; gattCharacteristic = null; actionQueue.clear(); etc. ?
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void sendGameChange(GameAction action) {
-        activeGattConnection.writeCharacteristic(
-                gattCharacteristic,
-                protocolEngine.encode(action),
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        );
+        if (activeGattConnection == null || gattCharacteristic == null) {
+            //TODO: Exception/return ?
+            //throw new IllegalStateException("No active connection to send data.");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {    //Android SDK 33+ meaning Android 13+
+            activeGattConnection.writeCharacteristic(
+                    gattCharacteristic,
+                    protocolEngine.encodeGameAction(action),
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            );
+        } else {                                                        //Android SDK < 33 meaning Android 12 and below
+            gattCharacteristic.setValue(protocolEngine.encodeGameAction(action));
+            activeGattConnection.writeCharacteristic(gattCharacteristic);
+        }
     }
 
     @Override
