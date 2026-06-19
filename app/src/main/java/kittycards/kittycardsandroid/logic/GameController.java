@@ -1,6 +1,7 @@
 package kittycards.kittycardsandroid.logic;
 
 import kittycards.kittycardsandroid.components.IGameController;
+import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.Field;
 import kittycards.kittycardsandroid.model.GameColor;
@@ -8,6 +9,7 @@ import kittycards.kittycardsandroid.model.GameState;
 import kittycards.kittycardsandroid.model.Match;
 import kittycards.kittycardsandroid.model.MatchStatus;
 import kittycards.kittycardsandroid.model.Player;
+import kittycards.kittycardsandroid.network.GameAction;
 
 /**
  *
@@ -21,9 +23,10 @@ public class GameController implements IGameController {
      * Speichert die eine gemeinsame Instanz von GameController (?)
      */
     private static GameController INSTANCE;
-
     private Match match;
     private MoveValidator moveValidator;
+    private INetworkManager networkManager;
+    private Runnable onStateChangedListener;
 
 
     // --- Constructor ---
@@ -56,10 +59,13 @@ public class GameController implements IGameController {
         return match;
     }
 
-
     @Override
     public void setOnStateChangedListener(Runnable listener) {
-        //Das ist basically ein setter
+        this.onStateChangedListener = listener;
+    }
+
+    public void setNetworkManager(INetworkManager networkManager) {
+        this.networkManager = networkManager;
     }
 
 
@@ -97,7 +103,15 @@ public class GameController implements IGameController {
     }
 
     private void notifyStateChanged() {
-        // TODO: Implement listener notification
+        if(onStateChangedListener != null) {
+            onStateChangedListener.run();
+        }
+    }
+
+    private void sendGameAction(GameAction action) {
+        if(networkManager != null) {
+            networkManager.sendGameChange(action);
+        }
     }
 
 
@@ -112,7 +126,10 @@ public class GameController implements IGameController {
         this.moveValidator = new MoveValidator(getMatch());
         this.match.setMatchStatus(MatchStatus.RUNNING);
 
-        // TODO: Synchronize match start with remote device
+        // TODO : Send match start action
+
+        /*sendGameAction(new GameAction(GameAction.ActionType.START_MATCH));
+        notifyStateChanged();*/
     }
 
     @Override
@@ -122,11 +139,17 @@ public class GameController implements IGameController {
         }
 
         player.selectCard(card);
+
+        /*sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
+        notifyStateChanged();*/
     }
 
     @Override
     public void unselectCard(Player player) {
         player.unselectCard();
+
+        /*sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        notifyStateChanged();*/
     }
 
     @Override
@@ -146,13 +169,20 @@ public class GameController implements IGameController {
 
         if(gameState.isGameOver()) {
             match.startNextRound();
+
+            if(match.getMatchStatus() == MatchStatus.FINISHED) {
+                // TODO : Send match end action
+            }
+            else {
+                // TODO: Send next round action
+            }
         }
         else {
             switchTurn();
         }
 
-        // TODO: Send play action to remote device
-        // TODO: Notify UI listener
+        sendGameAction(new GameAction(GameAction.ActionType.PLAY_CARD, selectedCard, column, row));
+        notifyStateChanged();
     }
 
     @Override
@@ -166,8 +196,8 @@ public class GameController implements IGameController {
 
         switchTurn();
 
-        // TODO: Send draw action to remote device
-        // TODO: Notify UI listener
+        sendGameAction(new GameAction(GameAction.ActionType.DRAW_CARD, newCard));
+        notifyStateChanged();
 
 
         /*
