@@ -1,9 +1,9 @@
 package kittycards.kittycardsandroid.components;
 
-import java.util.ArrayList;
-
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
+import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
+import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
 
 /**
  * Handles all network-related tasks, particularly establishing the connection between Guest and the Host
@@ -16,19 +16,27 @@ public interface INetworkManager {
 
     /**
      * To be called when the host wishes to open a Room for a new match.
-     * Handles Network permissions and the advertisement to other mobile phones
+     * Starts BLE advertising to make this device discoverable to potential guests.
+     * <p>
+     * Requires {@link android.Manifest.permission#BLUETOOTH_ADVERTISE} to be granted
+     * before calling this method.
      *
-     * @return a continuously updating list of found NetworkDevices willing to join the match
+     * @param listener The callback to be invoked when a guest successfully connects to this host.
      */
-    ArrayList<NetworkDevice> hostMatch();
+    void hostMatch(OnGuestConnectedListener listener);
 
     /**
      * To be called when the guest wishes to join a match.
-     * Handles Network permissions and searches for hosted matches advertised by other phones
+     * Scans for hosted matches advertised by other devices.
+     * <p>
+     * Requires {@link android.Manifest.permission#BLUETOOTH_SCAN} to be granted
+     * before calling this method.
      *
-     * @return a continuously updating list of found NetworkDevices offering a game to join
+     * @param listener The callback to be invoked when network devices offering a game are discovered.
+     *                 The listener will be called multiple times as devices are found, for up to 10 seconds
+     *                 after this method is called.
      */
-    ArrayList<NetworkDevice> joinMatch();
+    void joinMatch(OnDeviceFoundListener listener);
 
     /**
      * Should be called when the guest wishes to confirm and connect to the selected player.
