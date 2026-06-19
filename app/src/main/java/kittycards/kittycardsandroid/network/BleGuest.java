@@ -91,7 +91,7 @@ public class BleGuest {
             try {
                 networkManager.decodeAndQueueData(value);
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                Thread.currentThread().interrupt();//TODO do we need an isInterruped check? Can we maybe remove this line?
             }
         }
 
@@ -173,6 +173,7 @@ public class BleGuest {
             //throw new IllegalStateException("No active connection to send data.");
             return;
         }
+        //TODO: Fehlende Outgoing-Queue (Sende-Warteschlange)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {    //Android SDK 33+ meaning Android 13+
             activeGattConnection.writeCharacteristic(gattCharacteristic, networkManager.protocolEngine.encodeGameAction(action), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
         } else {                                                        //Android SDK < 33 meaning Android 12 and below

@@ -86,7 +86,7 @@ public class BleHost {
                     // Daten decodieren und in dieselbe actionQueue packen
                     networkManager.decodeAndQueueData(value);
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                    Thread.currentThread().interrupt();//TODO do we need an isInterruped check? Can we maybe remove this line?
                 }
 
                 // Ein Server MUSS dem Client antworten, dass die Daten angekommen sind

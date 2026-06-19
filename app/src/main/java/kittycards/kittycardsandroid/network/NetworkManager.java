@@ -22,9 +22,9 @@ import kittycards.kittycardsandroid.components.IProtocolEngine;
  */
 public class NetworkManager implements INetworkManager {
     //TODO: OutgoingQueue für sendGame, wenn mehrere gleichzeitig senden wollen.
-    public static final UUID KITTY_CARDS_SERVICE_UUID = UUID.fromString("0aac93ed-aff4-4ef0-85ef-019c11b3e434");//from: https://www.uuidgenerator.net/
-    public static final UUID KITTY_CARDS_CHARACTERISTIC_UUID = UUID.fromString("f4439cae-c811-418e-b314-c7258d85710c");//from: https://www.uuidgenerator.net/
-    public static final long SCAN_PERIOD = 10000;
+    static final UUID KITTY_CARDS_SERVICE_UUID = UUID.fromString("0aac93ed-aff4-4ef0-85ef-019c11b3e434");//from: https://www.uuidgenerator.net/
+    static final UUID KITTY_CARDS_CHARACTERISTIC_UUID = UUID.fromString("f4439cae-c811-418e-b314-c7258d85710c");//from: https://www.uuidgenerator.net/
+    static final long SCAN_PERIOD = 10000;
 
     private static volatile NetworkManager instance;
 
@@ -32,8 +32,8 @@ public class NetworkManager implements INetworkManager {
     private final BluetoothAdapter bluetoothAdapter;
     private final BluetoothManager bluetoothManager;
 
-    public final Handler handler = new Handler(Looper.getMainLooper());
-    public final IProtocolEngine protocolEngine;
+    final Handler handler = new Handler(Looper.getMainLooper());
+    final IProtocolEngine protocolEngine;
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
 
     private final BleGuest bleGuest;
