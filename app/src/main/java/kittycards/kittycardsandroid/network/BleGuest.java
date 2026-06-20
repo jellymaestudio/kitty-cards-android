@@ -1,13 +1,13 @@
 package kittycards.kittycardsandroid.network;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -22,9 +22,15 @@ import androidx.annotation.RequiresPermission;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Acts as the BLE Central/Client in the Bluetooth Low Energy communication, meaning it scans for hosts and connects to them as a guest.
+ *
+ * @author red_concrete
+ */
 public class BleGuest {
     private final NetworkManager networkManager;
     private final Context context;
+    private final BluetoothManager bluetoothManager;
     private final BluetoothAdapter bluetoothAdapter;
 
     private boolean scanning = false;
@@ -37,7 +43,7 @@ public class BleGuest {
     private final ScanCallback leScanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            @SuppressLint("MissingPermission") NetworkDevice device = new NetworkDevice(result.getDevice().getName(), result.getDevice().getAddress());
+            NetworkDevice device = NetworkDevice.from(result.getDevice());
 
             if (!foundRooms.contains(device)) {
                 foundRooms.add(device);
@@ -88,11 +94,7 @@ public class BleGuest {
         }
 
         private void handleIncomingData(byte[] value) {
-            try {
-                networkManager.decodeAndQueueData(value);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();//TODO do we need an isInterruped check? Can we maybe remove this line?
-            }
+            networkManager.decodeAndQueueDataSafe(value);
         }
 
         @Override
@@ -101,16 +103,20 @@ public class BleGuest {
         }
     };
 
-    public BleGuest(NetworkManager networkManager, Context context, BluetoothAdapter bluetoothAdapter) {
+    public BleGuest(NetworkManager networkManager, Context context, BluetoothManager bluetoothManager) {
         this.networkManager = networkManager;
         this.context = context;
-        this.bluetoothAdapter = bluetoothAdapter;
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager.getAdapter();
     }
 
     // -------------------------------------------------------------------------
     // Scan
     // -------------------------------------------------------------------------
 
+    /**
+     * @see NetworkManager#joinMatch(OnDeviceFoundListener)
+     */
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     public void joinMatch(OnDeviceFoundListener listener) {
         this.deviceListener = listener;

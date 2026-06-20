@@ -8,16 +8,31 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothGattServerCallback;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.AdvertiseData;
+import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.content.Context;
+import android.os.Build;
+import android.os.ParcelUuid;
 
 import androidx.annotation.RequiresPermission;
 
 import java.util.ArrayList;
-
+/**
+ * Acts as the BLE Peripheral/Server in the Bluetooth Low Energy communication, meaning it advertises itself as a host and accepts connections from guests.
+ *
+ * @author red_concrete
+ */
 public class BleHost {
+
     private final NetworkManager networkManager;
+    private final BluetoothManager bluetoothManager;
     private final BluetoothAdapter bluetoothAdapter;
+    private final Context context;
+
 
     private BluetoothGattServer bluetoothGattServer;
     private BluetoothLeAdvertiser advertiser;
@@ -43,8 +58,7 @@ public class BleHost {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
-            @SuppressLint("MissingPermission")
-            NetworkDevice networkDevice = new NetworkDevice(device.getName(), device.getAddress());
+            NetworkDevice networkDevice = NetworkDevice.from(device);
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
 
@@ -82,12 +96,7 @@ public class BleHost {
                                                  int offset, byte[] value) {
 
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
-                try {
-                    // Daten decodieren und in dieselbe actionQueue packen
-                    networkManager.decodeAndQueueData(value);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();//TODO do we need an isInterruped check? Can we maybe remove this line?
-                }
+                networkManager.decodeAndQueueDataSafe(value);
 
                 // Ein Server MUSS dem Client antworten, dass die Daten angekommen sind
                 if (responseNeeded) {
@@ -97,9 +106,11 @@ public class BleHost {
         }
     };
 
-    public BleHost(NetworkManager networkManager, BluetoothAdapter bluetoothAdapter) {
+    public BleHost(NetworkManager networkManager, Context context, BluetoothManager bluetoothManager) {
         this.networkManager = networkManager;
-        this.bluetoothAdapter = bluetoothAdapter;
+        this.context = context;
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager.getAdapter();
     }
 
     public void hostMatch(OnGuestConnectedListener listener) {
@@ -108,6 +119,36 @@ public class BleHost {
     }
 
     public void selectGuest(NetworkDevice guest) {
-        // TODO: Accept the selected guest, (disconnect the others?)
+        // TODO: Accept the selected guest, disconnect the others
+    }
+
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
+    public void disconnect() {
+        if (advertiser != null) {
+            advertiser.stopAdvertising(advertiseCallback);
+            advertiser = null;
+        }
+        if (bluetoothGattServer != null) {
+            bluetoothGattServer.close();
+            bluetoothGattServer = null;
+        }
+        connectedGuests.clear();
+        selectedGuestDevice = null;
+        serverCharacteristic = null;
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    public void sendGameChange(GameAction action) {
+        if (bluetoothGattServer == null || serverCharacteristic == null || selectedGuestDevice == null) {
+            return; //TODO: Exception/return?
+        }
+        byte[] data = networkManager.protocolEngine.encodeGameAction(action);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false, data);
+        } else {
+            serverCharacteristic.setValue(data);
+            bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false);
+        }
     }
 }
