@@ -113,9 +113,36 @@ public class BleHost {
         this.bluetoothAdapter = bluetoothManager.getAdapter();
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void hostMatch(OnGuestConnectedListener listener) {
         this.guestListener = listener;
-        //TODO: Implement hosting functionality (BLE advertising, accepting connections, etc.)
+        startAdvertising();
+        startGattServer();
+    }
+
+    private void startAdvertising() {
+        advertiser = bluetoothAdapter.getBluetoothLeAdvertiser();
+        AdvertiseData data = new AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .addServiceUuid(new ParcelUuid(NetworkManager.KITTY_CARDS_SERVICE_UUID))
+                .build();
+        AdvertiseSettings settings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setConnectable(true)
+                .setTimeout(0)
+                .build();
+
+        advertiser.startAdvertising(settings, data, advertiseCallback);
+        //TODO Ready?
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private void startGattServer() {
+
+        bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
+
+        //TODO BluetoothGattService und Characteristic vorbereiten (UUIDs, Properties, Permissions) und zum Server hinzufügen
+
     }
 
     public void selectGuest(NetworkDevice guest) {
