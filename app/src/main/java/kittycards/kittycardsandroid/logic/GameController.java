@@ -16,21 +16,28 @@ import kittycards.kittycardsandroid.model.Player;
 import kittycards.kittycardsandroid.network.GameAction;
 
 /**
- *
+ * Controls the game flow of a Kitty Cards match.
+ * <p>
+ * The GameController is responsible for validating player actions,
+ * updating the game state, handling turn changes and coordinating
+ * network communication between connected devices.
+ * <p>
+ * Implemented as a singleton to provide a single shared controller
+ * instance throughout the application.
  *
  * @author JellyMae
- * @author red_concrete
  */
 public class GameController implements IGameController {
 
-    /**
-     * Speichert die eine gemeinsame Instanz von GameController (?)
-     */
+    // --- Fields ---
+
     private static GameController INSTANCE;
+
     private Match match;
     private Player localPlayer;
     private Role role = Role.NOT_CONNECTED;
     private final List<GameColor> receivedBoardColors = new ArrayList<>();
+
     private MoveValidator moveValidator;
     private INetworkManager networkManager;
     private Runnable onStateChangedListener;
@@ -38,21 +45,18 @@ public class GameController implements IGameController {
 
     // --- Constructor ---
 
-    /**
-     * Constructor
-     */
     private GameController() {
 
     }
 
 
-    // --- Getters and Setters ---
+    // --- Singleton ---
 
     /**
-     * Bedeutet: Wenn es noch keinen GameController gibt: Erstelle einen.
-     * Sonst: Gib mir den vorhandenen zurück.
+     * Returns the singleton instance of the GameController.
+     * Creates the instance if it does not already exist.
      *
-     * @return die GameController Instanz
+     * @return the GameController instance
      */
     public static GameController getInstance() {
         if (INSTANCE == null) {
@@ -62,81 +66,142 @@ public class GameController implements IGameController {
         return INSTANCE;
     }
 
+
+    // --- Configuration ---
+
+    /**
+     * Returns the currently active match.
+     *
+     * @return the active match
+     */
     public Match getMatch() {
         return match;
     }
 
+    /**
+     * Sets the player controlled by the local device.
+     *
+     * @param localPlayer the local player
+     */
     public void setLocalPlayer(Player localPlayer) {
         this.localPlayer = localPlayer;
     }
 
+    /**
+     * Returns the player controlled by the remote device.
+     *
+     * @return the remote player
+     */
     public Player getRemotePlayer() {
         return match.getOtherPlayer(localPlayer);
     }
+
 
     @Override
     public void setOnStateChangedListener(Runnable listener) {
         this.onStateChangedListener = listener;
     }
 
+    /**
+     * Sets the NetworkManager used for sending and receiving game actions.
+     *
+     * @param networkManager the network manager
+     */
     public void setNetworkManager(INetworkManager networkManager) {
         this.networkManager = networkManager;
     }
 
+    /**
+     * Sets the role of this device within the network connection.
+     *
+     * @param role the network role
+     */
     public void setNetworkRole(Role role) {
         this.role = role;
     }
 
 
-    // --- Assistance Methods ---
+    // --- Public Game Actions ---
 
-    private Card generateCard() {
-        int value = (int) (Math.random() * 6) + 1;
-        int colorIndex = (int) (Math.random() * (GameColor.values().length - 1));
-        GameColor color = GameColor.values()[colorIndex];
+    @Override
+    public void startMatch(Player playerOne, Player playerTwo) {
+        applyStartMatch(playerOne, playerTwo);
 
-        return new Card(color, value);
+        if (role == Role.HOST) {
+            sendBoardSetup();
+        }
+
+        notifyStateChanged();
     }
 
-    private int calculateScore(Card card, Field field) {
-        GameColor cardColor = card.getColor();
-        GameColor fieldColor = field.getColor();
 
-        if(fieldColor == GameColor.WHITE) {
-            return card.getValue();
+    @Override
+    public void selectCard(Player player, Card card) {
+        if (!moveValidator.canSelectCard(player, card)) {
+            return;
         }
-        else if(cardColor == fieldColor) {
-            return card.getValue() * 2;
-        }
-        else {
-            return 0;
-        }
+
+        applySelectCard(player, card);
+
+        sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
+        notifyStateChanged();
     }
 
-    private void switchTurn() {
-        GameState gameState = match.getGameState();
+    @Override
+    public void unselectCard(Player player) {
+        applyUnselectCard(player);
 
-        gameState.setCurrentPlayer(
-                match.getOtherPlayer(gameState.getCurrentPlayer())
-        );
+        sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        notifyStateChanged();
     }
 
-    private void notifyStateChanged() {
-        if(onStateChangedListener != null) {
-            onStateChangedListener.run();
+
+    @Override
+    public void playCard(Player player, int row, int column) {
+        if (!moveValidator.canPlayCard(player, row, column)) {
+            return;
         }
+
+        Card selectedCard = player.getSelectedCard();
+
+        applyPlayCard(player, selectedCard, row, column);
+
+        sendGameAction(new GameAction(
+                GameAction.ActionType.PLAY_CARD,
+                selectedCard,
+                column,
+                row
+        ));
+
+        notifyStateChanged();
     }
 
-    // Sendet eine GameAction ans Network, aber nur wenn networkManager != null ist
-    private void sendGameAction(GameAction action) {
-        if(networkManager != null) {
-            networkManager.sendGameChange(action);
+
+    @Override
+    public void drawCard(Player player) {
+        if (!moveValidator.canDrawCard(player)) {
+            return;
         }
+
+        Card card = generateCard();
+
+        applyDrawCard(player, card);
+
+        sendGameAction(new GameAction(
+                GameAction.ActionType.DRAW_CARD,
+                card
+        ));
+
+        notifyStateChanged();
     }
 
-    // Startet einen neuen Thread. Dieser ruft dauerhaft fetchNextAction() auf und wartet
-    // auf neue Nachrichten vom anderen Gerät. Wenn eine Nachricht kommt, wird
-    // handleRemoteAction(action) ausgeführt.
+
+    // --- Remote Action Handling ---
+
+    /**
+     * Starts a background thread that continuously listens for incoming
+     * game actions from the remote device.
+     */
     public void startListeningForActions() {
         new Thread(() -> {
             while (role != Role.NOT_CONNECTED) {
@@ -151,13 +216,12 @@ public class GameController implements IGameController {
         }).start();
     }
 
-    // Schaut, welche Action empfangen wurde:
-    //
-    //  DRAW_CARD       → applyDrawCard(...)
-    //  PLAY_CARD       → applyPlayCard(...)
-    //  SELECT_CARD     → applySelectCard(...)
-    //  UNSELECT_CARD   → applyUnselectCard(...)
-    //  SET_BOARD_COLOR → applyBoardColor(...)
+    /**
+     * Processes a game action received from the remote device and applies
+     * the corresponding state changes locally.
+     *
+     * @param action the received game action
+     */
     public void handleRemoteAction(GameAction action) {
         switch (action.type()) {
             case DRAW_CARD:
@@ -189,28 +253,8 @@ public class GameController implements IGameController {
         notifyStateChanged();
     }
 
-    private void applyBoardColor(GameColor color) {
-        receivedBoardColors.add(color);
 
-        if (receivedBoardColors.size() == 8) {
-            match.startNextRound(receivedBoardColors);
-            receivedBoardColors.clear();
-        }
-    }
-
-
-    // --- GameController Management ---
-
-    @Override
-    public void startMatch(Player playerOne, Player playerTwo) {
-        applyStartMatch(playerOne, playerTwo);
-
-        if (role == Role.HOST) {
-            sendBoardSetup();
-        }
-
-        notifyStateChanged();
-    }
+    // --- Local Apply Methods ---
 
     private void applyStartMatch(Player playerOne, Player playerTwo) {
         this.match = new Match(playerOne, playerTwo);
@@ -219,55 +263,14 @@ public class GameController implements IGameController {
     }
 
 
-    @Override
-    public void selectCard(Player player, Card card) {
-        if(!moveValidator.canSelectCard(player, card)) {
-            return;
-        }
-
-        applySelectCard(player, card);
-
-        sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
-        notifyStateChanged();
-    }
-
     private void applySelectCard(Player player, Card card) {
         player.selectCard(card);
-    }
-
-
-    @Override
-    public void unselectCard(Player player) {
-        applyUnselectCard(player);
-
-        sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
-        notifyStateChanged();
     }
 
     private void applyUnselectCard(Player player) {
         player.unselectCard();
     }
 
-
-    @Override
-    public void playCard(Player player, int row, int column) {
-        if(!moveValidator.canPlayCard(player, row, column)) {
-            return;
-        }
-
-        Card selectedCard = player.getSelectedCard();
-
-        applyPlayCard(player, selectedCard, row, column);
-
-        sendGameAction(new GameAction(
-                GameAction.ActionType.PLAY_CARD,
-                selectedCard,
-                column,
-                row
-        ));
-
-        notifyStateChanged();
-    }
 
     // Führt den Kartenzug wirklich aus: Karte aufs Feld, Punkte berechnen, Karte entfernen,
     // ggf. Zug wechseln. Falls das Board voll ist, startet aktuell nur der Host die nächste
@@ -282,14 +285,80 @@ public class GameController implements IGameController {
         player.removeCard(card);
 
         if (gameState.isGameOver()) {
-            if ( role == Role.HOST) {
+            if (role == Role.HOST) {
                 match.startNextRound();
+
+                Player startingPlayer = match.getGameState().getStartingPlayer();
+
+                // TODO: Determine how the starting player is send
+                sendStartingPlayer(startingPlayer);
                 sendBoardSetup();
             }
             return;
         }
 
         switchTurn();
+    }
+
+
+    private void applyDrawCard(Player player, Card card) {
+        player.addCard(card);
+        switchTurn();
+    }
+
+
+    private void applyBoardColor(GameColor color) {
+        receivedBoardColors.add(color);
+
+        if (receivedBoardColors.size() == 8) {
+            match.startNextRound(receivedBoardColors, player);
+            receivedBoardColors.clear();
+        }
+    }
+
+
+    // --- Helper Methods ---
+
+    private Card generateCard() {
+        int value = (int) (Math.random() * 6) + 1;
+        int colorIndex = (int) (Math.random() * (GameColor.values().length - 1));
+        GameColor color = GameColor.values()[colorIndex];
+
+        return new Card(color, value);
+    }
+
+    private int calculateScore(Card card, Field field) {
+        GameColor cardColor = card.getColor();
+        GameColor fieldColor = field.getColor();
+
+        if (fieldColor == GameColor.WHITE) {
+            return card.getValue();
+        } else if (cardColor == fieldColor) {
+            return card.getValue() * 2;
+        } else {
+            return 0;
+        }
+    }
+
+    private void switchTurn() {
+        GameState gameState = match.getGameState();
+
+        gameState.setCurrentPlayer(
+                match.getOtherPlayer(gameState.getCurrentPlayer())
+        );
+    }
+
+    private void notifyStateChanged() {
+        if (onStateChangedListener != null) {
+            onStateChangedListener.run();
+        }
+    }
+
+    // Sendet eine GameAction ans Network, aber nur wenn networkManager != null ist
+    private void sendGameAction(GameAction action) {
+        if (networkManager != null) {
+            networkManager.sendGameChange(action);
+        }
     }
 
     private void sendBoardSetup() {
@@ -307,29 +376,5 @@ public class GameController implements IGameController {
                 }
             }
         }
-    }
-
-
-    @Override
-    public void drawCard(Player player) {
-        if(!moveValidator.canDrawCard(player)) {
-            return;
-        }
-
-        Card card = generateCard();
-
-        applyDrawCard(player, card);
-
-        sendGameAction(new GameAction(
-                GameAction.ActionType.DRAW_CARD,
-                card
-        ));
-
-        notifyStateChanged();
-    }
-
-    private void applyDrawCard(Player player, Card card) {
-        player.addCard(card);
-        switchTurn();
     }
 }

@@ -70,11 +70,11 @@ public class Match {
      *
      * @param player the reference player
      * @return the other player in the match
-     * @throws NullPointerException if {@code player} is {@code null}
+     * @throws NullPointerException     if {@code player} is {@code null}
      * @throws IllegalArgumentException if {@code player} is not part of this match
      */
     public Player getOtherPlayer(Player player) {
-        if(player == null) {
+        if (player == null) {
             throw new NullPointerException("player cannot be null");
         }
         if (player != playerOne && player != playerTwo) {
@@ -149,9 +149,12 @@ public class Match {
     // --- Match Management ---
 
     /**
-     * Prepares a new round by choosing the next starting player,
-     * updating the round winner if necessary, resetting round-specific
-     * player data and creating a new game state.
+     * Prepares a new round.
+     * <p>
+     * Chooses the next starting player, updates the round winner if
+     * necessary, resets round-specific player data and creates a new
+     * game state.
+     * </p>
      */
     private void prepareNewRound() {
         Player startingPlayer = getNextStartingPlayer();
@@ -168,9 +171,18 @@ public class Match {
         gameState = new GameState(startingPlayer, secondPlayer);
     }
 
-    private void prepareNewRound(List<GameColor> fieldColors) {
-        Player startingPlayer = getNextStartingPlayer();
-
+    /**
+     * Prepares a new round using the provided board colors.
+     * <p>
+     * Chooses the given Player as the next starting player, updates the round
+     * winner if necessary, resets round-specific player data and creates a new
+     * game state with the given field colors.
+     * </p>
+     *
+     * @param fieldColors    the colors used to initialize the new board
+     * @param startingPlayer the player that starts the next round
+     */
+    private void prepareNewRound(List<GameColor> fieldColors, Player startingPlayer) {
         if (matchState.getCurrentRound() > 1) {
             addWinToRoundWinner();
         }
@@ -225,13 +237,24 @@ public class Match {
         prepareNewRound();
     }
 
-    public void startNextRound(List<GameColor> fieldColors) {
+    /**
+     * Starts the next round if the match is not finished yet.
+     * <p>
+     * If the match has already ended, the status is set to {@link MatchStatus#FINISHED}.
+     * Otherwise, the round counter increases and a new round is prepared using the
+     * provided board colors.
+     * </p>
+     *
+     * @param fieldColors    the colors used to initialize the new board
+     * @param startingPlayer the player that starts the next round
+     */
+    public void startNextRound(List<GameColor> fieldColors, Player startingPlayer) {
         if (matchState.isMatchFinished(playerOne, playerTwo)) {
             matchStatus = MatchStatus.FINISHED;
             return;
         }
 
         matchState.nextRound();
-        prepareNewRound(fieldColors);
+        prepareNewRound(fieldColors, startingPlayer);
     }
 }
