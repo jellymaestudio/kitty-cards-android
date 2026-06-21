@@ -1,5 +1,7 @@
 package kittycards.kittycardsandroid.model;
 
+import java.util.List;
+
 /**
  * Represents the current state of a single round.
  * <p>
@@ -30,6 +32,17 @@ public class GameState {
         }
 
         this.board = new Board();
+        this.startingPlayer = startingPlayer;
+        this.secondPlayer = secondPlayer;
+        this.currentPlayer = startingPlayer;
+    }
+
+    public GameState(Player startingPlayer, Player secondPlayer, List<GameColor> fieldColors) {
+        if (startingPlayer == null || secondPlayer == null) {
+            throw new NullPointerException("players cannot be null");
+        }
+
+        this.board = new Board(fieldColors);
         this.startingPlayer = startingPlayer;
         this.secondPlayer = secondPlayer;
         this.currentPlayer = startingPlayer;

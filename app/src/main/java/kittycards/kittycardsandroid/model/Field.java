@@ -11,7 +11,7 @@ package kittycards.kittycardsandroid.model;
  */
 public class Field {
 
-    private final GameColor color;
+    private GameColor color;
     private final int row;
     private final int column;
     private Card card;
@@ -52,6 +52,10 @@ public class Field {
      */
     public GameColor getColor() {
         return color;
+    }
+
+    public void setColor(GameColor color) {
+        this.color = color;
     }
 
     /**

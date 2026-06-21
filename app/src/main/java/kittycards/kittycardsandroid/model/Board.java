@@ -30,11 +30,34 @@ public class Board {
      */
     public Board() {
         fields = new Field[3][3];
-        initializeFields();
+        initializeFields(randomizeFieldColors());
+    }
+
+    public Board(List<GameColor> fieldColors) {
+        if (fieldColors == null || fieldColors.size() != 8) {
+            throw new IllegalArgumentException("fieldColors must contain exactly 8 colors");
+        }
+
+        fields = new Field[3][3];
+        initializeFields(fieldColors);
     }
 
 
     // --- Getters ---
+
+    public List<GameColor> getFieldColors() {
+        List<GameColor> fieldColors = new ArrayList<>();
+
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                if (!isCenterField(row, column)) {
+                    fieldColors.add(fields[row][column].getColor());
+                }
+            }
+        }
+
+        return fieldColors;
+    }
 
     /**
      * Checks whether the given position is on the board.
@@ -95,10 +118,7 @@ public class Board {
 
     // --- Board Management ---
 
-    private void initializeFields() {
-        List<GameColor> fieldColors = randomizeFieldColors();
-        Collections.shuffle(fieldColors);
-
+    private void initializeFields(List<GameColor> fieldColors) {
         int index = 0;
 
         for (int row = 0; row < 3; row++) {
@@ -127,6 +147,8 @@ public class Board {
             fieldColors.add(GameColor.WHITE);
             fieldColors.add(coloredFields.get((int) (Math.random() * coloredFields.size())));
         }
+
+        Collections.shuffle(fieldColors);
 
         return fieldColors;
     }

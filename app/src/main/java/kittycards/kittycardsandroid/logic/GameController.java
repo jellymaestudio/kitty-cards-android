@@ -1,7 +1,11 @@
 package kittycards.kittycardsandroid.logic;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import kittycards.kittycardsandroid.components.IGameController;
 import kittycards.kittycardsandroid.components.INetworkManager;
+import kittycards.kittycardsandroid.model.Board;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.Field;
 import kittycards.kittycardsandroid.model.GameColor;
@@ -24,6 +28,9 @@ public class GameController implements IGameController {
      */
     private static GameController INSTANCE;
     private Match match;
+    private Player localPlayer;
+    private Role role = Role.NOT_CONNECTED;
+    private final List<GameColor> receivedBoardColors = new ArrayList<>();
     private MoveValidator moveValidator;
     private INetworkManager networkManager;
     private Runnable onStateChangedListener;
@@ -59,6 +66,14 @@ public class GameController implements IGameController {
         return match;
     }
 
+    public void setLocalPlayer(Player localPlayer) {
+        this.localPlayer = localPlayer;
+    }
+
+    public Player getRemotePlayer() {
+        return match.getOtherPlayer(localPlayer);
+    }
+
     @Override
     public void setOnStateChangedListener(Runnable listener) {
         this.onStateChangedListener = listener;
@@ -66,6 +81,10 @@ public class GameController implements IGameController {
 
     public void setNetworkManager(INetworkManager networkManager) {
         this.networkManager = networkManager;
+    }
+
+    public void setNetworkRole(Role role) {
+        this.role = role;
     }
 
 
@@ -108,9 +127,74 @@ public class GameController implements IGameController {
         }
     }
 
+    // Sendet eine GameAction ans Network, aber nur wenn networkManager != null ist
     private void sendGameAction(GameAction action) {
         if(networkManager != null) {
             networkManager.sendGameChange(action);
+        }
+    }
+
+    // Startet einen neuen Thread. Dieser ruft dauerhaft fetchNextAction() auf und wartet
+    // auf neue Nachrichten vom anderen Gerät. Wenn eine Nachricht kommt, wird
+    // handleRemoteAction(action) ausgeführt.
+    public void startListeningForActions() {
+        new Thread(() -> {
+            while (role != Role.NOT_CONNECTED) {
+                try {
+                    GameAction action = networkManager.fetchNextAction();
+                    handleRemoteAction(action);
+                } catch (InterruptedException e) {
+                    role = Role.NOT_CONNECTED;
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }).start();
+    }
+
+    // Schaut, welche Action empfangen wurde:
+    //
+    //  DRAW_CARD       → applyDrawCard(...)
+    //  PLAY_CARD       → applyPlayCard(...)
+    //  SELECT_CARD     → applySelectCard(...)
+    //  UNSELECT_CARD   → applyUnselectCard(...)
+    //  SET_BOARD_COLOR → applyBoardColor(...)
+    public void handleRemoteAction(GameAction action) {
+        switch (action.type()) {
+            case DRAW_CARD:
+                applyDrawCard(getRemotePlayer(), action.card());
+                break;
+
+            case PLAY_CARD:
+                applyPlayCard(
+                        getRemotePlayer(),
+                        action.card(),
+                        action.boardPositionRow(),
+                        action.boardPositionColumn()
+                );
+                break;
+
+            case SELECT_CARD:
+                applySelectCard(getRemotePlayer(), action.card());
+                break;
+
+            case UNSELECT_CARD:
+                applyUnselectCard(getRemotePlayer());
+                break;
+
+            case SET_BOARD_COLOR:
+                applyBoardColor(action.boardColor());
+                break;
+        }
+
+        notifyStateChanged();
+    }
+
+    private void applyBoardColor(GameColor color) {
+        receivedBoardColors.add(color);
+
+        if (receivedBoardColors.size() == 8) {
+            match.startNextRound(receivedBoardColors);
+            receivedBoardColors.clear();
         }
     }
 
@@ -119,18 +203,21 @@ public class GameController implements IGameController {
 
     @Override
     public void startMatch(Player playerOne, Player playerTwo) {
-        //Darf nur Host ausführen!! -> ich geh davon aus, dass die Bedingung erfüllt ist
-        //Hat genau 2 Spieler im Raum -> -"-
+        applyStartMatch(playerOne, playerTwo);
 
+        if (role == Role.HOST) {
+            sendBoardSetup();
+        }
+
+        notifyStateChanged();
+    }
+
+    private void applyStartMatch(Player playerOne, Player playerTwo) {
         this.match = new Match(playerOne, playerTwo);
         this.moveValidator = new MoveValidator(getMatch());
         this.match.setMatchStatus(MatchStatus.RUNNING);
-
-        // TODO : Send match start action
-
-        /*sendGameAction(new GameAction(GameAction.ActionType.START_MATCH));
-        notifyStateChanged();*/
     }
+
 
     @Override
     public void selectCard(Player player, Card card) {
@@ -138,19 +225,29 @@ public class GameController implements IGameController {
             return;
         }
 
-        player.selectCard(card);
+        applySelectCard(player, card);
 
-        /*sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
-        notifyStateChanged();*/
+        sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
+        notifyStateChanged();
     }
+
+    private void applySelectCard(Player player, Card card) {
+        player.selectCard(card);
+    }
+
 
     @Override
     public void unselectCard(Player player) {
-        player.unselectCard();
+        applyUnselectCard(player);
 
-        /*sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
-        notifyStateChanged();*/
+        sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        notifyStateChanged();
     }
+
+    private void applyUnselectCard(Player player) {
+        player.unselectCard();
+    }
+
 
     @Override
     public void playCard(Player player, int row, int column) {
@@ -158,32 +255,60 @@ public class GameController implements IGameController {
             return;
         }
 
-        GameState gameState = match.getGameState();
-        Field choosenField = gameState.getBoard().getField(row, column);
         Card selectedCard = player.getSelectedCard();
 
-        choosenField.placeCard(selectedCard);
-        gameState.getCurrentPlayer().addScore(calculateScore(selectedCard, choosenField));
-        player.unselectCard();
-        player.removeCard(selectedCard);
+        applyPlayCard(player, selectedCard, row, column);
 
-        if(gameState.isGameOver()) {
-            match.startNextRound();
+        sendGameAction(new GameAction(
+                GameAction.ActionType.PLAY_CARD,
+                selectedCard,
+                column,
+                row
+        ));
 
-            if(match.getMatchStatus() == MatchStatus.FINISHED) {
-                // TODO : Send match end action
-            }
-            else {
-                // TODO: Send next round action
-            }
-        }
-        else {
-            switchTurn();
-        }
-
-        sendGameAction(new GameAction(GameAction.ActionType.PLAY_CARD, selectedCard, column, row));
         notifyStateChanged();
     }
+
+    // Führt den Kartenzug wirklich aus: Karte aufs Feld, Punkte berechnen, Karte entfernen,
+    // ggf. Zug wechseln. Falls das Board voll ist, startet aktuell nur der Host die nächste
+    // Runde und sendet danach Boardfarben.
+    private void applyPlayCard(Player player, Card card, int row, int column) {
+        GameState gameState = match.getGameState();
+        Field chosenField = gameState.getBoard().getField(row, column);
+
+        chosenField.placeCard(card);
+        player.addScore(calculateScore(card, chosenField));
+        player.unselectCard();
+        player.removeCard(card);
+
+        if (gameState.isGameOver()) {
+            if ( role == Role.HOST) {
+                match.startNextRound();
+                sendBoardSetup();
+            }
+            return;
+        }
+
+        switchTurn();
+    }
+
+    private void sendBoardSetup() {
+        Board board = match.getGameState().getBoard();
+
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                if (!board.isCenterField(row, column)) {
+                    sendGameAction(new GameAction(
+                            GameAction.ActionType.SET_BOARD_COLOR,
+                            board.getField(row, column).getColor(),
+                            column,
+                            row
+                    ));
+                }
+            }
+        }
+    }
+
 
     @Override
     public void drawCard(Player player) {
@@ -191,101 +316,20 @@ public class GameController implements IGameController {
             return;
         }
 
-        Card newCard = generateCard();
-        player.addCard(newCard);
+        Card card = generateCard();
 
-        switchTurn();
+        applyDrawCard(player, card);
 
-        sendGameAction(new GameAction(GameAction.ActionType.DRAW_CARD, newCard));
+        sendGameAction(new GameAction(
+                GameAction.ActionType.DRAW_CARD,
+                card
+        ));
+
         notifyStateChanged();
+    }
 
-
-        /*
-        remote:
-            - keine neue Karte beim anderen Gerät generieren
-            - empfangene Karte hinzufügen
-         */
+    private void applyDrawCard(Player player, Card card) {
+        player.addCard(card);
+        switchTurn();
     }
 }
-
-
-    /*
-    Brainstorm:
-    (Das soll alles in diese Klasse, die Namen "ScoreCalculator", etc dienen gerade nur als Überschrift, um die Abschnitte besser zu unterteilen)
-
-    ---
-    Legende:
-    (?) = Unsicher
-    (!) = Problem entdeckt, nicht so übernehmen!
-    (/) = Idee verworfen
-    ---
-
-    - calculateScore(Card playedCard, Field playedField)
-    -> bekommt Card + Field; berechnet, wieviele Punkte ein Spieler beim Legen der Karte erhält
-        -> Weißes Feld                              -> normale Punkte
-        -> Farbiges Feld mit gleichfarbiger Karte   -> doppelte Punkte
-        -> Farbiges Feld mit andersfarbiger Farbe   -> keine Punkte
-
-
-    - switchTurn() -> über GameState: setCurrentPlayer() und getOtherPlayer() (?)
-
-
-    - generateCard()
-    -> generiert zufällige Karte mit Farbe (kein Weiß) und Wert (1-6)
-    -> Player darf nur max. 10 Karten auf der Hand haben (MoveValidator)
-
-
-    - GameMessageHandler ->
-    -> sendet/erhält Daten an/von Network; pausiert Game bis Daten gesendet/erhalten wurden (mit MatchState aktualisierung)
-    -> übersetzt Spielaktionen in GameMessages, verarbeitet empfangene GameMessages (?)
-    -> Interface: setOnStateChangedListener(Runnable listener) (?)
-
-    - GameController (GC) (Hauptfunktionen und nicht Methode):
-    -> kümmert sich um: Game starten, Karte aus-/abwählen, Karte ziehen, Karte legen, CurrentPlayer ändern, Game beenden
-    -> Muss mit Network und UI kommunizieren
-    -> z.B: Spieler will Karte legen:
-        -> GC fragt MoveValidator nach Erlaubnis, GC legt Karte, GC fragt ScoreCalculator nach Punkten, GC erhöht Score des Spielers, GC fragt ob Board voll ist, GameState bzw. Match wird aktualisier, Network kriegt Info (am besten nur das, was sich explizit geändert hat)
-    -> Interface:
-        -> startMatch(Player playerOne, Player playerTwo), drawCard(Player player), selectCard(Player player, Card card), unselectCard(Player player), playCard()
-           (/) -> playCard(int row, in column) im Interface würde ich vllt zu playCard(Card selectedCard, Field field) ändern (falls das geht)
-
-
-
-    - playCard(row, column)
-    -> validatePlayCard(...)
-    -> Karte aufs Feld legen
-    -> Punkte berechnen
-    -> Spielerpunkte erhöhen
-    -> Karte aus der Hand entfernen
-    -> Prüfen, ob Runde vorbei ist
-    -> ggf. nächste Runde starten
-    -> sonst Spieler wechseln
-    -> Network informieren
-    -> Listener informieren
-
-
-    - startMatch()
-    -> nur Host/UI darf es auslösen
-    -> prüft: genau 2 Spieler im Raum
-    -> erstellt Match
-    -> setzt Status auf RUNNING
-    -> sendet Start-Action ans Network
-    -> Informiert UI
-
-
-    - Wenn Player nicht dran ist, hör auf:
-    if (!moveValidator.isPlayersTurn(player, match)) {
-        return;
-    }
-
-
-    Für Leonard:
-
-    - handleStartMatchAction() --> für den Gast, der nicht hostet
-    -> empfängt Matchdaten
-    -> erstellt lokalen Match-Zustand passend zum Host
-    -> setzt Status auf RUNNING
-    -> informiert UI
-
-
-     */

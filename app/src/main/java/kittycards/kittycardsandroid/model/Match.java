@@ -1,5 +1,7 @@
 package kittycards.kittycardsandroid.model;
 
+import java.util.List;
+
 /**
  * Represents a complete match between two players.
  * <p>
@@ -166,6 +168,21 @@ public class Match {
         gameState = new GameState(startingPlayer, secondPlayer);
     }
 
+    private void prepareNewRound(List<GameColor> fieldColors) {
+        Player startingPlayer = getNextStartingPlayer();
+
+        if (matchState.getCurrentRound() > 1) {
+            addWinToRoundWinner();
+        }
+
+        Player secondPlayer = getOtherPlayer(startingPlayer);
+
+        playerOne.reset();
+        playerTwo.reset();
+
+        gameState = new GameState(startingPlayer, secondPlayer, fieldColors);
+    }
+
     /**
      * Randomly selects one of the two players as the starting player.
      *
@@ -206,5 +223,15 @@ public class Match {
 
         matchState.nextRound();
         prepareNewRound();
+    }
+
+    public void startNextRound(List<GameColor> fieldColors) {
+        if (matchState.isMatchFinished(playerOne, playerTwo)) {
+            matchStatus = MatchStatus.FINISHED;
+            return;
+        }
+
+        matchState.nextRound();
+        prepareNewRound(fieldColors);
     }
 }
