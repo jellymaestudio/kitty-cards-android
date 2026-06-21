@@ -43,7 +43,7 @@ public class Field {
     }
 
 
-    // --- Getters ---
+    // --- Getters and Setters ---
 
     /**
      * Returns the color of this field.
@@ -54,7 +54,17 @@ public class Field {
         return color;
     }
 
+    /**
+     * Updates the color of this field.
+     *
+     * @param color the new field color
+     * @throws NullPointerException if color is {@code null}
+     */
     public void setColor(GameColor color) {
+        if (color == null) {
+            throw new NullPointerException("color cannot be null");
+        }
+
         this.color = color;
     }
 

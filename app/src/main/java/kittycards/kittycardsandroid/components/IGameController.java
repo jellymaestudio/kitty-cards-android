@@ -19,7 +19,10 @@ import kittycards.kittycardsandroid.model.Player;
 public interface IGameController {
 
     /**
-     * Should be called when the guest device has been connected, to initiate the Match and the GameBoard
+     * Starts a new match using the provided players.
+     *
+     * @param playerOne the first player
+     * @param playerTwo the second player
      */
     void startMatch(Player playerOne, Player playerTwo);
 
@@ -28,8 +31,8 @@ public interface IGameController {
      * A selected card can subsequently be played via {@link #playCard(Player, int, int)}.
      * The selected card must be transmitted to the remote device.
      *
-     * @param player the Player who selects the card
-     * @param card   the card to be selected
+     * @param player the player selecting the card
+     * @param card   the card to select
      */
     void selectCard(Player player, Card card);
 
@@ -38,24 +41,26 @@ public interface IGameController {
      * Has no effect if no card is currently selected.
      * The unselection must be transmitted to the remote device.
      *
-     * @param player the Player
+     * @param player the player whose card selection is cleared
      */
     void unselectCard(Player player);
 
     /**
-     * Places the currently selected card of the currentPlayer onto the board at (row, column).
-     * Requires a card to be selected by the currentPlayer via {@link #selectCard(Player, Card)} )} beforehand.
+     * Places the selected card of the specified player onto the given board position.
+     * Requires a card to be selected by the currentPlayer via {@link #selectCard(Player, Card)} beforehand.
      * The action must be transmitted to the remote device.
      *
-     * @param row    the row of the field onto which the card is placed.
-     * @param column the column of the field onto which the card is placed.
+     * @param player the player performing the action
+     * @param row    the target row
+     * @param column the target column
      */
     void playCard(Player player, int row, int column);
 
     /**
-     * Draws a card from the game pile and adds it to the currentPlayer's hand.
-     * Ends the turn.
+     * Draws a new card for the specified player.
      * The drawn card must be transmitted to the remote device.
+     *
+     * @param player the player drawing a card
      */
     void drawCard(Player player);
 

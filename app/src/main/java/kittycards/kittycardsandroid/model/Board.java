@@ -33,6 +33,17 @@ public class Board {
         initializeFields(randomizeFieldColors());
     }
 
+    /**
+     * Creates a new game board using predefined field colors.
+     * <p>
+     * The provided colors are assigned to all non-center fields,
+     * while the center field is always white.
+     * </p>
+     *
+     * @param fieldColors the colors used to initialize the board
+     * @throws IllegalArgumentException if the list does not contain exactly eight colors
+     *                                  or if the color list is {@code null}
+     */
     public Board(List<GameColor> fieldColors) {
         if (fieldColors == null || fieldColors.size() != 8) {
             throw new IllegalArgumentException("fieldColors must contain exactly 8 colors");
@@ -45,6 +56,11 @@ public class Board {
 
     // --- Getters ---
 
+    /**
+     * Returns the colors of all non-center fields in board order.
+     *
+     * @return a list containing the colors of all non-center fields
+     */
     public List<GameColor> getFieldColors() {
         List<GameColor> fieldColors = new ArrayList<>();
 
