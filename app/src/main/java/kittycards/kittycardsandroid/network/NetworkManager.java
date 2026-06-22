@@ -112,6 +112,7 @@ public class NetworkManager implements INetworkManager {
         bleGuest.confirmRoom(room);
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void selectGuest(NetworkDevice guest) {
         bleHost.selectGuest(guest);
@@ -124,7 +125,8 @@ public class NetworkManager implements INetworkManager {
         switch (role) {
             case GUEST -> bleGuest.disconnect();
             case HOST -> bleHost.disconnect();
-            case NOT_CONNECTED -> {}
+            case NOT_CONNECTED -> {
+            }
         }
         role = Role.NOT_CONNECTED;
         actionQueue.clear();
