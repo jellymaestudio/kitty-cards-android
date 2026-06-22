@@ -14,6 +14,7 @@ import kittycards.kittycardsandroid.model.Match;
 import kittycards.kittycardsandroid.model.MatchStatus;
 import kittycards.kittycardsandroid.model.Player;
 import kittycards.kittycardsandroid.network.GameAction;
+import kittycards.kittycardsandroid.network.Role;
 
 /**
  * Controls the game flow of a Kitty Cards match.
@@ -37,7 +38,7 @@ public class GameController implements IGameController {
     private Player localPlayer;
     private Role role = Role.NOT_CONNECTED;
     private final List<GameColor> receivedBoardColors = new ArrayList<>();
-
+    private Player receivedStartingPlayer;
     private MoveValidator moveValidator;
     private INetworkManager networkManager;
     private Runnable onStateChangedListener;
@@ -248,6 +249,14 @@ public class GameController implements IGameController {
             case SET_BOARD_COLOR:
                 applyBoardColor(action.boardColor());
                 break;
+
+            case SET_STARTING_PLAYER:
+                if (action.contextSensitiveInt() == 0) {
+                    receivedStartingPlayer = match.getPlayerOne();
+                } else {
+                    receivedStartingPlayer = match.getPlayerTwo();
+                }
+                break;
         }
 
         notifyStateChanged();
@@ -272,9 +281,6 @@ public class GameController implements IGameController {
     }
 
 
-    // Führt den Kartenzug wirklich aus: Karte aufs Feld, Punkte berechnen, Karte entfernen,
-    // ggf. Zug wechseln. Falls das Board voll ist, startet aktuell nur der Host die nächste
-    // Runde und sendet danach Boardfarben.
     private void applyPlayCard(Player player, Card card, int row, int column) {
         GameState gameState = match.getGameState();
         Field chosenField = gameState.getBoard().getField(row, column);
@@ -287,11 +293,7 @@ public class GameController implements IGameController {
         if (gameState.isGameOver()) {
             if (role == Role.HOST) {
                 match.startNextRound();
-
-                Player startingPlayer = match.getGameState().getStartingPlayer();
-
-                // TODO: Determine how the starting player is send
-                sendStartingPlayer(startingPlayer);
+                sendStartingPlayer();
                 sendBoardSetup();
             }
             return;
@@ -310,9 +312,10 @@ public class GameController implements IGameController {
     private void applyBoardColor(GameColor color) {
         receivedBoardColors.add(color);
 
-        if (receivedBoardColors.size() == 8) {
-            match.startNextRound(receivedBoardColors, player);
+        if (receivedBoardColors.size() == 8 && receivedStartingPlayer != null) {
+            match.startNextRound(receivedBoardColors, receivedStartingPlayer);
             receivedBoardColors.clear();
+            receivedStartingPlayer = null;
         }
     }
 
@@ -354,7 +357,6 @@ public class GameController implements IGameController {
         }
     }
 
-    // Sendet eine GameAction ans Network, aber nur wenn networkManager != null ist
     private void sendGameAction(GameAction action) {
         if (networkManager != null) {
             networkManager.sendGameChange(action);
@@ -376,5 +378,16 @@ public class GameController implements IGameController {
                 }
             }
         }
+    }
+
+    private void sendStartingPlayer() {
+        Player startingPlayer = match.getGameState().getStartingPlayer();
+
+        int playerIndex = startingPlayer == match.getPlayerOne() ? 0 : 1;
+
+        sendGameAction(new GameAction(
+                GameAction.ActionType.SET_STARTING_PLAYER,
+                playerIndex
+        ));
     }
 }
