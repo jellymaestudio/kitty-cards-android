@@ -4,6 +4,7 @@ import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
+import kittycards.kittycardsandroid.network.Role;
 
 /**
  * Handles all network-related tasks, particularly establishing the connection between Guest and the Host
@@ -76,5 +77,12 @@ public interface INetworkManager {
      *                              in order to end the wait prematurely.
      */
     GameAction fetchNextAction() throws InterruptedException;
+
+    /**
+     * Returns the current role of this device in the network connection (Host, Guest, or Not Connected).
+     *
+     * @return
+     */
+    Role getRole();
 
 }

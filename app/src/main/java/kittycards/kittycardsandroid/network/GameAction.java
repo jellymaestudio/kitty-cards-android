@@ -9,7 +9,7 @@ import kittycards.kittycardsandroid.model.GameColor;
  * @author red_concrete
  */
 public record GameAction(ActionType type, Card card, GameColor boardColor, int boardPositionColumn,
-                         int boardPositionRow) {
+                         int boardPositionRow, int contextSensitiveInt) {
     /**
      * Creates a GameAction without a card or board position.
      * Suitable for {@link ActionType#UNSELECT_CARD}.
@@ -19,7 +19,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
      * @throws IllegalArgumentException if {@code type} requires a card
      */
     public GameAction(ActionType type) {
-        this(type, null, null, -1, -1);
+        this(type, null, null, -1, -1, -1);
     }
 
     /**
@@ -34,7 +34,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
      *                                  or if {@code type} requires a board position
      */
     public GameAction(ActionType type, Card card) {
-        this(type, card, null, -1, -1);
+        this(type, card, null, -1, -1, -1);
     }
 
     /**
@@ -54,7 +54,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
      *                                  or if the board position is invalid
      */
     public GameAction(ActionType type, GameColor boardColor, int boardPositionColumn, int boardPositionRow) {
-        this(type, null, boardColor, boardPositionColumn, boardPositionRow);
+        this(type, null, boardColor, boardPositionColumn, boardPositionRow, -1);
     }
 
     /**
@@ -70,7 +70,19 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
      * @throws IllegalArgumentException if the board position is invalid
      */
     public GameAction(ActionType type, Card card, int boardPositionColumn, int boardPositionRow) {
-        this(type, card, null, boardPositionColumn, boardPositionRow);
+        this(type, card, null, boardPositionColumn, boardPositionRow, -1);
+    }
+
+    /**
+     * Creates a GameAction with a context-sensitive integer parameter.
+     * Intended for {@link ActionType#SET_STARTING_PLAYER}, with host being 0 and guest being 1.
+     *
+     * @param type                the type of action; must not be {@code null}
+     * @param contextSensitiveInt the context-sensitive integer parameter; interpretation depends on {@code type}
+     * @throws NullPointerException if {@code type} is {@code null}
+     */
+    public GameAction(ActionType type, int contextSensitiveInt) {
+        this(type, null, null, -1, -1, contextSensitiveInt);
     }
 
     /**
@@ -98,16 +110,16 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
 
     public GameAction {
         if (type == null)
-            throw new NullPointerException("ActionType darf nicht null sein");
+            throw new NullPointerException("ActionType must not be null");
 
         if ((type == ActionType.DRAW_CARD || type == ActionType.SELECT_CARD || type == ActionType.PLAY_CARD) && card == null)
-            throw new IllegalArgumentException(type + " erfordert eine Karte");
+            throw new IllegalArgumentException(type + " requires a card");
 
         if ((type == ActionType.PLAY_CARD || type == ActionType.SET_BOARD_COLOR) && (boardPositionColumn < 0 || boardPositionColumn > 2 || boardPositionRow < 0 || boardPositionRow > 2))
-            throw new IllegalArgumentException(type.name() + " erfordert eine gültige Boardposition");
+            throw new IllegalArgumentException(type.name() + " requires a valid board position");
 
         if (type == ActionType.SET_BOARD_COLOR && boardColor == null)
-            throw new IllegalArgumentException("SET_BOARD_COLOR erfordert eine Farbe");
+            throw new IllegalArgumentException("SET_BOARD_COLOR requires a color");
     }
 
     public enum ActionType {
@@ -116,6 +128,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
         SELECT_CARD, //must be sent together with the selected card
         UNSELECT_CARD,
         PLAY_CARD, //must be specified together with the card being played and the board position
-        SET_BOARD_COLOR //must be specified together with the color being set and the board position
+        SET_BOARD_COLOR, //must be specified together with the color being set and the board position
+        SET_STARTING_PLAYER //must be specified together with the contextSensitiveInt, which is the player index of the starting player (Host: 0 or Guest: 1)
     }
 }

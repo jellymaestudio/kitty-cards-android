@@ -36,6 +36,7 @@ public class NetworkManager implements INetworkManager {
     final IProtocolEngine protocolEngine;
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
 
+    private volatile Role role = Role.NOT_CONNECTED;
     private final BleGuest bleGuest;
     private final BleHost bleHost;
 
@@ -48,8 +49,8 @@ public class NetworkManager implements INetworkManager {
         this.bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.bluetoothAdapter = bluetoothManager.getAdapter();
 
-        this.bleGuest = new BleGuest(this, this.context, this.bluetoothAdapter);
-        this.bleHost = new BleHost(this, this.bluetoothAdapter);
+        this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
+        this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
     }
 
     public static NetworkManager getInstance(Context context) {
@@ -75,10 +76,15 @@ public class NetworkManager implements INetworkManager {
     // -------------------------------------------------------------------------
 
     // BLE background thread calls this when data arrives
-    void decodeAndQueueData(byte[] bytes) throws InterruptedException {
+    void decodeAndQueueDataSafe(byte[] bytes) {
         GameAction action = protocolEngine.decodeGameAction(bytes);
-        actionQueue.put(action);
+        try {
+            actionQueue.put(action);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
+
 
     // -------------------------------------------------------------------------
     // INetworkManager
@@ -86,17 +92,14 @@ public class NetworkManager implements INetworkManager {
 
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
+        role = Role.HOST;
         bleHost.hostMatch(listener);
-    }
-
-    @Override
-    public void selectGuest(NetworkDevice guest) {
-        bleHost.selectGuest(guest);
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     @Override
     public void joinMatch(OnDeviceFoundListener listener) {
+        role = Role.GUEST;
         bleGuest.joinMatch(listener);
     }
 
@@ -106,22 +109,46 @@ public class NetworkManager implements INetworkManager {
         bleGuest.confirmRoom(room);
     }
 
+    @Override
+    public void selectGuest(NetworkDevice guest) {
+        bleHost.selectGuest(guest);
+    }
+
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void disconnect() {
-        bleGuest.disconnect();
-        // Falls Host-Disconnect Logik dazukommt, hier aufrufen: bleHost.disconnect();
+        switch (role) {
+            case GUEST -> bleGuest.disconnect();
+            case HOST -> bleHost.disconnect();
+            case NOT_CONNECTED -> {
+            }
+        }
+        role = Role.NOT_CONNECTED;
         actionQueue.clear();
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void sendGameChange(GameAction action) {
-        bleGuest.sendGameChange(action);
+        switch (role) {
+            case GUEST -> bleGuest.sendGameChange(action);
+            case HOST -> bleHost.sendGameChange(action);
+            case NOT_CONNECTED ->
+                    throw new IllegalStateException("Not connected - cannot send an action.");
+        }
     }
 
     @Override
     public GameAction fetchNextAction() throws InterruptedException {
         return actionQueue.take(); // Blocks the calling thread until something is in the queue
+    }
+
+    // -------------------------------------------------------------------------
+    // Getter/Setter
+    // -------------------------------------------------------------------------
+
+
+    public Role getRole() {
+        return role;
     }
 }
