@@ -1,5 +1,9 @@
 package kittycards.kittycardsandroid.components;
 
+import android.Manifest;
+
+import androidx.annotation.RequiresPermission;
+
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
@@ -24,6 +28,7 @@ public interface INetworkManager {
      *
      * @param listener The callback to be invoked when a guest successfully connects to this host.
      */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT})
     void hostMatch(OnGuestConnectedListener listener);
 
     /**
@@ -37,6 +42,7 @@ public interface INetworkManager {
      *                 The listener will be called multiple times as devices are found, for up to 10 seconds
      *                 after this method is called.
      */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     void joinMatch(OnDeviceFoundListener listener);
 
     /**
@@ -45,6 +51,7 @@ public interface INetworkManager {
      *
      * @param room the host device the player wants to join to
      */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN})
     void confirmRoom(NetworkDevice room);
 
     /**
@@ -52,19 +59,17 @@ public interface INetworkManager {
      *
      * @param guest The guest device the host wishes to accept.
      */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     void selectGuest(NetworkDevice guest);
 
     /**
      * Closes the active Network connection to the remote device.
      * Should be called when the match ends or a player disconnects.
      */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     void disconnect();
 
-    /**
-     * Sends raw data to the connected remote device.
-     *
-     * @param action The raw byte array to be transmitted.
-     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     void sendGameChange(GameAction action);
 
     /**
