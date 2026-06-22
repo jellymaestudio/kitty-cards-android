@@ -92,6 +92,7 @@ public class NetworkManager implements INetworkManager {
     // INetworkManager
     // -------------------------------------------------------------------------
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
         role = Role.HOST;
@@ -116,14 +117,14 @@ public class NetworkManager implements INetworkManager {
         bleHost.selectGuest(guest);
     }
 
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
+
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void disconnect() {
         switch (role) {
             case GUEST -> bleGuest.disconnect();
             case HOST -> bleHost.disconnect();
-            case NOT_CONNECTED -> {
-            }
+            case NOT_CONNECTED -> {}
         }
         role = Role.NOT_CONNECTED;
         actionQueue.clear();
