@@ -115,6 +115,10 @@ public class BleHost {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void hostMatch(OnGuestConnectedListener listener) {
+        if (bluetoothAdapter.getBluetoothLeAdvertiser() == null) {
+            // TODO Error handling: BLE advertising not supported on this device
+            return;
+        }
         this.guestListener = listener;
         startAdvertising();
         startGattServer();
@@ -163,8 +167,24 @@ public class BleHost {
         bluetoothGattServer.addService(service);
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void selectGuest(NetworkDevice guest) {
-        // TODO: Accept the selected guest, disconnect the others
+        if (!connectedGuests.contains(guest)) {
+            return; // TODO: Exception/Error handling: The selected guest is not in the list of connected guests
+        }
+
+        selectedGuestDevice = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
+
+        for (NetworkDevice other : new ArrayList<>(connectedGuests)) {
+            if (!other.equals(guest)) {
+                BluetoothDevice device = bluetoothAdapter.getRemoteDevice(other.deviceAddress());
+                bluetoothGattServer.cancelConnection(device);
+            }
+        }
+        // TODO: Validate that responseNeeded handling and cancelConnection() don't race —
+        //  multiple onConnectionStateChange(DISCONNECTED) callbacks will fire here,
+        //  each triggering guestListener.onGuestListUpdated(). Debounce if this causes
+        //  unwanted UI flicker.
     }
 
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
