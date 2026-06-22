@@ -1,7 +1,6 @@
 package kittycards.kittycardsandroid.network;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -21,6 +20,7 @@ import android.os.ParcelUuid;
 import androidx.annotation.RequiresPermission;
 
 import java.util.ArrayList;
+
 /**
  * Acts as the BLE Peripheral/Server in the Bluetooth Low Energy communication, meaning it advertises itself as a host and accepts connections from guests.
  *
@@ -129,20 +129,28 @@ public class BleHost {
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
-                .setTimeout(0)
+                .setTimeout(120000)
                 .build();
 
         advertiser.startAdvertising(settings, data, advertiseCallback);
-        //TODO Ready?
+        //TODO Call disconnect in UI if game is paused or left, to save battery
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void startGattServer() {
-
         bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
 
-        //TODO BluetoothGattService und Characteristic vorbereiten (UUIDs, Properties, Permissions) und zum Server hinzufügen
+        //TODO BluetoothGattService und Characteristic vorbereiten (UUIDs, Properties, Permissions) und zum Server hinzufügen hier weiter machen
+        serverCharacteristic = new BluetoothGattCharacteristic(
+                NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID,
+                BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                BluetoothGattCharacteristic.PERMISSION_WRITE
+        );
 
+
+        BluetoothGattService service = new BluetoothGattService(NetworkManager.KITTY_CARDS_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
+        service.addCharacteristic(serverCharacteristic);
+        bluetoothGattServer.addService(service);
     }
 
     public void selectGuest(NetworkDevice guest) {
