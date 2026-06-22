@@ -75,7 +75,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
 
     /**
      * Creates a GameAction with a context-sensitive integer parameter.
-     * Intended for {@link ActionType#SET_STARTING_PLAYER}, with host being 0 and guest being 1.
+     * Intended for {@link ActionType#SET_STARTING_PLAYER}, with player one being 0 and player two being 1.
      *
      * @param type                the type of action; must not be {@code null}
      * @param contextSensitiveInt the context-sensitive integer parameter; interpretation depends on {@code type}
