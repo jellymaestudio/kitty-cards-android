@@ -86,7 +86,7 @@ public interface INetworkManager {
     /**
      * Returns the current role of this device in the network connection (Host, Guest, or Not Connected).
      *
-     * @return
+     * @return the role of this device in the network connection
      */
     Role getRole();
 
