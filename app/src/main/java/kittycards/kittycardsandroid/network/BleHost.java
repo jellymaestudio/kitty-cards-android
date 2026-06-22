@@ -21,7 +21,6 @@ import androidx.annotation.RequiresPermission;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Queue;
 
 /**
@@ -51,7 +50,7 @@ public class BleHost {
     private final android.bluetooth.le.AdvertiseCallback advertiseCallback = new android.bluetooth.le.AdvertiseCallback() {
         @Override
         public void onStartSuccess(android.bluetooth.le.AdvertiseSettings settingsInEffect) {
-            // TODO (?) Host is now discoverable by other devices during scanning
+            // Host is now discoverable by other devices during scanning
         }
 
         @Override
@@ -116,6 +115,7 @@ public class BleHost {
             }
         }
 
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onNotificationSent(BluetoothDevice device, int status) {
             networkManager.handler.post(() -> {
@@ -167,7 +167,7 @@ public class BleHost {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void startGattServer() {
         bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
-        if (bluetoothGattServer == null) return;// TODO: Error handling (e.g. Bluetooth not available, disabled or permission missing)
+        if (bluetoothGattServer == null) return; // TODO: Error handling (e.g. Bluetooth not available, disabled or permission missing)
 
         int writeProperty = BluetoothGattCharacteristic.PROPERTY_WRITE;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -192,8 +192,7 @@ public class BleHost {
     public void selectGuest(NetworkDevice guest) {
         networkManager.handler.post(() -> {
             if (!connectedGuests.contains(guest) || bluetoothAdapter == null || bluetoothGattServer == null) {
-                return;// TODO: Exception/Error handling: The selected guest is not in the list of connected guests
-
+                return; // TODO: Exception/Error handling: The selected guest is not in the list of connected guests
             }
 
             selectedGuestDevice = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
@@ -234,7 +233,7 @@ public class BleHost {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void sendGameChange(GameAction action) {
         if (bluetoothGattServer == null || serverCharacteristic == null || selectedGuestDevice == null) {
-            return; //TODO: Exception/return?
+            return; // TODO: Exception/return?
         }
         byte[] data = networkManager.protocolEngine.encodeGameAction(action);
 
@@ -252,7 +251,6 @@ public class BleHost {
 
         notificationInProgress = true;
         byte[] data = outgoingQueue.poll();
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false, data);
         } else {

@@ -19,6 +19,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Build;
 import android.os.ParcelUuid;
+import android.util.Log;
 
 import androidx.annotation.RequiresPermission;
 
@@ -60,6 +61,7 @@ public class BleGuest {
         writeInProgress = false;
         processNextWrite();
     };
+
     private final ScanCallback leScanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
@@ -85,7 +87,6 @@ public class BleGuest {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-
             networkManager.handler.post(() -> {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     connected = false;
@@ -97,7 +98,6 @@ public class BleGuest {
                     gattCharacteristic = null;
                     outgoingQueue.clear();
                     writeInProgress = false;
-                    // TODO: networkManager.handleRemoteDisconnect(); ?
                     return;
                 }
 
@@ -107,8 +107,7 @@ public class BleGuest {
 
 
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    // TODO: Dealing with a loss of connection
-                    //   what about gatt.close() =
+                    // TODO: Dealing with a loss of connection (e.g. inform GameController/UI)
                     connected = false;
                     networkManager.handler.removeCallbacks(writeTimeoutRunnable);
                     outgoingQueue.clear();
@@ -118,7 +117,6 @@ public class BleGuest {
                         activeGattConnection.close();
                     }
                     activeGattConnection = null;
-                    // TODO: networkManager.handleRemoteDisconnect(); ?
                 }
             });
         }
@@ -126,29 +124,22 @@ public class BleGuest {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-
             networkManager.handler.post(() -> {
                 if (status != BluetoothGatt.GATT_SUCCESS) return;
 
                 BluetoothGattService service = gatt.getService(NetworkManager.KITTY_CARDS_SERVICE_UUID);
-
                 if (service == null)
-                    return;// TODO: Handle Error (connected to a device that doesn't offer the expected service)
-
+                    return; // TODO: Handle Error (connected to a device that doesn't offer the expected service)
 
                 BluetoothGattCharacteristic characteristic = service.getCharacteristic(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID);
                 if (characteristic == null)
-                    return;// TODO: Handle Error (connected to a device that doesn't offer the expected characteristic)
+                    return; // TODO: Handle Error (connected to a device that doesn't offer the expected characteristic)
 
                 gattCharacteristic = characteristic;
-                gatt.setCharacteristicNotification(gattCharacteristic, true);//local setting: report changes to onCharacteristicChanged()
-
+                gatt.setCharacteristicNotification(gattCharacteristic, true);
 
                 BluetoothGattDescriptor descriptor = gattCharacteristic.getDescriptor(NetworkManager.CCCD_UUID);
-
-                if (descriptor == null)
-                    return; // TODO: (can this even happen?) Handle Error (missing CCCD descriptor, can't enable notifications on the client side)
-
+                if (descriptor == null) return;
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
@@ -178,13 +169,13 @@ public class BleGuest {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            // TODO: Confirmation that sendGameChange() has been received?
+            // TODO: Confirmation that sendGameChange() has been received by host?
             networkManager.handler.post(() -> {
                 networkManager.handler.removeCallbacks(writeTimeoutRunnable);
                 writeInProgress = false;
                 if (status != BluetoothGatt.GATT_SUCCESS) {
-                    // Optional:
-                    // Log.w("BLE", "Write failed: " + status);
+                    Log.w("BleGuest", "Characteristic write failed with status: " + status);
+                    // TODO: Fehlgeschlagenen Schreibvorgang wiederholen (Retry) oder UI über Übertragungsfehler informieren
                 }
 
                 processNextWrite();
@@ -234,7 +225,7 @@ public class BleGuest {
     private void stopScan() {
         if (bluetoothAdapter == null || bluetoothAdapter.getBluetoothLeScanner() == null) return;
 
-        if (scanning) { // TODO equal to bluetoothAdapter.getBluetoothLeScanner() != null ?
+        if (scanning) {
             bluetoothAdapter.getBluetoothLeScanner().stopScan(leScanCallback);
             scanning = false;
         } else {
@@ -274,9 +265,7 @@ public class BleGuest {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void sendGameChange(GameAction action) {
-        //TODO: Exception/return ?
-        //  throw new IllegalStateException("No active connection to send data.");
-        //TODO: Fehlende Outgoing-Queue (Sende-Warteschlange)
+        // TODO: Exception/return if not connected? (e.g. throw new IllegalStateException("No active connection to send data."))
         byte[] data = networkManager.protocolEngine.encodeGameAction(action);
         networkManager.handler.post(() -> {
             if (!connected || activeGattConnection == null || gattCharacteristic == null) return;
@@ -289,11 +278,8 @@ public class BleGuest {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void processNextWrite() {
-
-        if (writeInProgress) return;
-        if (!connected) return;
-        if (activeGattConnection == null) return;
-        if (gattCharacteristic == null) return;
+        if (writeInProgress || !connected || activeGattConnection == null || gattCharacteristic == null)
+            return;
 
         byte[] data = outgoingQueue.poll();
         if (data == null) return;
