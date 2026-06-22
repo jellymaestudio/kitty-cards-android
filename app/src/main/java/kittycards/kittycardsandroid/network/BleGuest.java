@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -73,12 +74,25 @@ public class BleGuest {
             }
         }
 
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             BluetoothGattService service = gatt.getService(NetworkManager.KITTY_CARDS_SERVICE_UUID);
-            if (service == null) return; // TODO: Fehler behandeln
+            if (service == null) return; // TODO: Handle Error (connected to a device that doesn't offer the expected service)
             gattCharacteristic = service.getCharacteristic(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID);
-            // TODO: activate Notifications
+            if (gattCharacteristic == null) return; // TODO: Handle Error (connected to a device that doesn't offer the expected characteristic)
+
+            gatt.setCharacteristicNotification(gattCharacteristic, true);//local setting: report changes to onCharacteristicChanged()
+
+            BluetoothGattDescriptor descriptor = gattCharacteristic.getDescriptor(NetworkManager.CCCD_UUID);
+            if (descriptor == null) return; // TODO: (can this even happen?) Handle Error (missing CCCD descriptor, can't enable notifications on the client side)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            } else {
+                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                gatt.writeDescriptor(descriptor);
+            }
         }
 
         // API 33+

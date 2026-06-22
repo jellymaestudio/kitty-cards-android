@@ -45,12 +45,12 @@ public class BleHost {
     private final android.bluetooth.le.AdvertiseCallback advertiseCallback = new android.bluetooth.le.AdvertiseCallback() {
         @Override
         public void onStartSuccess(android.bluetooth.le.AdvertiseSettings settingsInEffect) {
-            // TODO (?) Host wird jetzt von anderen Geräten beim Scannen gefunden
+            // TODO (?) Host is now discoverable by other devices during scanning
         }
 
         @Override
         public void onStartFailure(int errorCode) {
-            // TODO: Fehlerbehandlung, z.B. Werbung konnte nicht gestartet werden
+            // TODO: Error handling, e.g., advertising could not be started
         }
     };
 
@@ -71,23 +71,23 @@ public class BleHost {
                     }
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                // Gast hat die Verbindung verloren oder geschlossen -> aus der Liste entfernen
+                // Guest lost or closed the connection -> remove from the list
                 if (connectedGuests.remove(networkDevice)) {
 
-                    // UI informieren: Ein Gast hat die Lobby verlassen
+                    // Inform UI: A guest left the lobby
                     if (guestListener != null) {
                         networkManager.handler.post(() -> guestListener.onGuestListUpdated(new ArrayList<>(connectedGuests)));
                     }
                 }
                 if (selectedGuestDevice != null && selectedGuestDevice.getAddress().equals(device.getAddress())) {
                     selectedGuestDevice = null;
-                    // TODO: UI informieren, dass der aktive Spielpartner die Verbindung verloren hat
+                    // TODO: Inform GameController/UI that the active game partner lost connection
                 }
             }
         }
 
-        // WICHTIG: Das Gegenstück zu onCharacteristicChanged beim Client.
-        // Hier kommen die Spielzüge an, die der GAST an den HOST schickt!
+        // IMPORTANT: The counterpart to onCharacteristicChanged on the client side.
+        // This is where game moves sent by the GUEST arrive at the HOST!
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId,
@@ -98,7 +98,7 @@ public class BleHost {
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 networkManager.decodeAndQueueDataSafe(value);
 
-                // Ein Server MUSS dem Client antworten, dass die Daten angekommen sind
+                // A server MUST acknowledge to the client that the data was received
                 if (responseNeeded) {
                     bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
                 }
@@ -133,22 +133,32 @@ public class BleHost {
                 .build();
 
         advertiser.startAdvertising(settings, data, advertiseCallback);
-        //TODO Call disconnect in UI if game is paused or left, to save battery
+        // TODO: Call disconnect in GameController/UI if game is paused or left, to save battery
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void startGattServer() {
         bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
 
-        //TODO BluetoothGattService und Characteristic vorbereiten (UUIDs, Properties, Permissions) und zum Server hinzufügen hier weiter machen
+        if (bluetoothGattServer == null) {
+            // TODO: Error handling (e.g. Bluetooth not available, disabled or permission missing)
+            return;
+        }
+        int writeProperty = BluetoothGattCharacteristic.PROPERTY_WRITE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            writeProperty |= BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE;
+        }
         serverCharacteristic = new BluetoothGattCharacteristic(
                 NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID,
-                BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+                writeProperty | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_WRITE
         );
 
+        BluetoothGattService service = new BluetoothGattService(
+                NetworkManager.KITTY_CARDS_SERVICE_UUID,
+                BluetoothGattService.SERVICE_TYPE_PRIMARY
+        );
 
-        BluetoothGattService service = new BluetoothGattService(NetworkManager.KITTY_CARDS_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
         service.addCharacteristic(serverCharacteristic);
         bluetoothGattServer.addService(service);
     }
