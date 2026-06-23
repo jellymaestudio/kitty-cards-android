@@ -9,6 +9,7 @@ import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
 import kittycards.kittycardsandroid.network.Role;
+import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /**
  * Handles all network-related tasks, particularly establishing the connection between Guest and the Host
@@ -82,6 +83,14 @@ public interface INetworkManager {
      *                              in order to end the wait prematurely.
      */
     GameAction fetchNextAction() throws InterruptedException;
+
+    /**
+     * Sets the network event listener, which gets called upon a network event (e.g. a connect or disconnect notification or a bluetooth error.
+     * Meant to be set by the UI.
+     *
+     * @param listener the listener that defines the behavior when a network event occurs
+     */
+    void setNetworkEventListener(NetworkEventListener listener);
 
     /**
      * Returns the current role of this device in the network connection (Host, Guest, or Not Connected).
