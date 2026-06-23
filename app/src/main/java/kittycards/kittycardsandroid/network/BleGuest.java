@@ -85,7 +85,7 @@ public class BleGuest {
 
         @Override
         public void onScanFailed(int errorCode) {
-            emitEvent(ERROR, "Scan fehlgeschlagen: " + scanErrorText(errorCode));
+            emitEvent(ERROR, "Scan failed: " + scanErrorText(errorCode));
         }
     };
 
@@ -96,7 +96,7 @@ public class BleGuest {
             networkManager.handler.post(() -> {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     connected = false;
-                    emitEvent(ERROR, "Verbindungsfehler, Status: " + status);
+                    emitEvent(ERROR, "Connection error, status: " + status);
 
                     if (activeGattConnection != null) {
                         activeGattConnection.close();
@@ -133,18 +133,18 @@ public class BleGuest {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             networkManager.handler.post(() -> {
                 if (status != BluetoothGatt.GATT_SUCCESS) {
-                    emitEvent(ERROR, "Service Discovery fehlgeschlagen: " + status);
+                    emitEvent(ERROR, "Service discovery failed: " + status);
                     return;
                 }
 
                 BluetoothGattService service = gatt.getService(NetworkManager.KITTY_CARDS_SERVICE_UUID);
                 if (service == null) {
-                    emitEvent(ERROR, "Service nicht gefunden (UUID mismatch?)");
+                    emitEvent(ERROR, "Service not found (UUID mismatch?)");
                     return;
                 }
                 BluetoothGattCharacteristic characteristic = service.getCharacteristic(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID);
                 if (characteristic == null) {
-                    emitEvent(ERROR, "Characteristic fehlt auf Host");
+                    emitEvent(ERROR, "Characteristic missing on host");
                     return;
                 }
 
@@ -154,7 +154,7 @@ public class BleGuest {
                 BluetoothGattDescriptor descriptor = gattCharacteristic.getDescriptor(NetworkManager.CCCD_UUID);
                 if (descriptor == null) {
                     emitEvent(WARNING,
-                            "CCCD Descriptor fehlt – Notifications evtl. deaktiviert");
+                            "CCCD descriptor missing - notifications might be disabled");
                     return;
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -192,7 +192,7 @@ public class BleGuest {
 
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     emitEvent(ERROR,
-                            "Write fehlgeschlagen, Status: " + status);
+                            "Write failed, status: " + status);
                 }
                 processNextWrite();
             });
@@ -225,7 +225,7 @@ public class BleGuest {
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private void startScan() {
         if (bluetoothAdapter == null || bluetoothAdapter.getBluetoothLeScanner() == null) return;
-        emitEvent(INFO, "Scan gestartet");
+        emitEvent(INFO, "Scan started");
 
         if (!scanning) {
             scanning = true;
@@ -245,24 +245,24 @@ public class BleGuest {
         if (scanning) {
             bluetoothAdapter.getBluetoothLeScanner().stopScan(leScanCallback);
             scanning = false;
-            emitEvent(INFO, "Scan gestoppt");
+            emitEvent(INFO, "Scan stopped");
         } else {
             emitEvent(WARNING,
-                    "stopScan() wurde aufgerufen, obwohl scanning=false");
+                    "stopScan() was called even though scanning=false");
         }
     }
 
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN})
     public void confirmRoom(NetworkDevice room) {
         if (bluetoothAdapter == null) {
-            emitEvent(ERROR, "Bluetooth nicht verfügbar");
+            emitEvent(ERROR, "Bluetooth not available");
             return;
         }
         BluetoothDevice device;
         try {
             device = bluetoothAdapter.getRemoteDevice(room.deviceAddress());
         } catch (IllegalArgumentException e) {
-            emitEvent(ERROR, "Ungültige MAC-Adresse: " + room.deviceAddress());
+            emitEvent(ERROR, "Invalid MAC address: " + room.deviceAddress());
             return;
         }
         networkManager.handler.post(() -> {
@@ -297,14 +297,14 @@ public class BleGuest {
         byte[] data = networkManager.protocolEngine.encodeGameAction(action);
         networkManager.handler.post(() -> {
             if (!connected || activeGattConnection == null || gattCharacteristic == null) {
-                emitEvent(ERROR, "Senden abgebrochen: keine Verbindung");
+                emitEvent(ERROR, "Sending aborted: no connection");
                 return;
             }
 
             if (outgoingQueue.size() >= MAX_QUEUE_SIZE) {
                 outgoingQueue.poll();
                 emitEvent(WARNING,
-                        "Sende-Queue voll – älteste Nachricht verworfen");
+                        "Send queue full - oldest message discarded");
             }
             outgoingQueue.add(data);
             processNextWrite();
@@ -333,7 +333,7 @@ public class BleGuest {
 
         if (!success) {
             writeInProgress = false;
-            emitEvent(ERROR, "BLE Write konnte nicht gestartet werden");
+            emitEvent(ERROR, "BLE write could not be started");
             processNextWrite();
             return;
         }
@@ -349,21 +349,21 @@ public class BleGuest {
     private String scanErrorText(int code) {
         return switch (code) {
             case ScanCallback.SCAN_FAILED_ALREADY_STARTED ->
-                    "Scan bereits aktiv";
+                    "Scan already active";
 
             case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED ->
-                    "App Registrierung fehlgeschlagen";
+                    "App registration failed";
 
             case ScanCallback.SCAN_FAILED_INTERNAL_ERROR ->
-                    "Interner BLE Fehler";
+                    "Internal BLE error";
 
             case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED ->
-                    "BLE Scan nicht unterstützt";
+                    "BLE scan not supported";
 
             case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES ->
-                    "Zu viele BLE Scans aktiv";
+                    "Too many active BLE scans";
 
-            default -> "Unbekannter Scan Fehler (" + code + ")";
+            default -> "Unknown scan error (" + code + ")";
         };
     }
 }
