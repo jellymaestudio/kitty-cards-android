@@ -1,5 +1,9 @@
 package kittycards.kittycardsandroid.network;
 
+import static kittycards.kittycardsandroid.network.event.NetworkEvent.NetworkMessageType.ERROR;
+import static kittycards.kittycardsandroid.network.event.NetworkEvent.NetworkMessageType.INFO;
+import static kittycards.kittycardsandroid.network.event.NetworkEvent.NetworkMessageType.WARNING;
+
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -10,6 +14,7 @@ import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
@@ -22,6 +27,8 @@ import androidx.annotation.RequiresPermission;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
+
+import kittycards.kittycardsandroid.network.event.NetworkEvent;
 
 /**
  * Acts as the BLE Peripheral/Server in the Bluetooth Low Energy communication, meaning it
@@ -55,7 +62,7 @@ public class BleHost {
 
         @Override
         public void onStartFailure(int errorCode) {
-            // TODO: Error handling, e.g., advertising could not be started
+            emitEvent(ERROR, "Advertising fehlgeschlagen: " + advertiseErrorText(errorCode));
         }
     };
 
@@ -71,6 +78,7 @@ public class BleHost {
                     if (!connectedGuests.contains(networkDevice)) {
                         connectedGuests.add(networkDevice);
 
+                        emitEvent(INFO, "Gast verbunden: " + device.getAddress());
                         // Notify the UI thread if a listener is present
                         if (guestListener != null) {
                             guestListener.onGuestListUpdated(new ArrayList<>(connectedGuests));
@@ -80,6 +88,7 @@ public class BleHost {
                     // Guest lost or closed the connection -> remove from the list
                     if (connectedGuests.remove(networkDevice)) {
 
+                        emitEvent(WARNING, "Gast getrennt: " + device.getAddress());
                         // Inform UI: A guest left the lobby
                         if (guestListener != null) {
                             guestListener.onGuestListUpdated(new ArrayList<>(connectedGuests));
@@ -100,10 +109,7 @@ public class BleHost {
         // This is where game moves sent by the GUEST arrive at the HOST!
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
-        public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId,
-                                                 BluetoothGattCharacteristic characteristic,
-                                                 boolean preparedWrite, boolean responseNeeded,
-                                                 int offset, byte[] value) {
+        public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
 
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 networkManager.decodeAndQueueDataSafe(value);
@@ -118,6 +124,9 @@ public class BleHost {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onNotificationSent(BluetoothDevice device, int status) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                emitEvent(ERROR, "Notification fehlgeschlagen: " + status);
+            }
             networkManager.handler.post(() -> {
                 notificationInProgress = false;
                 processNextNotification();
@@ -135,7 +144,7 @@ public class BleHost {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void hostMatch(OnGuestConnectedListener listener) {
         if (bluetoothAdapter == null || bluetoothAdapter.getBluetoothLeAdvertiser() == null) {
-            // TODO Error handling: BLE advertising not supported on this device
+            emitEvent(ERROR, "BLE Advertising nicht unterstützt");
             return;
         }
         this.guestListener = listener;
@@ -143,6 +152,32 @@ public class BleHost {
             startGattServer();
             startAdvertising();
         });
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private void startGattServer() {
+        bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
+        if (bluetoothGattServer == null) {
+            emitEvent(ERROR, "GattServer konnte nicht geöffnet werden");
+            return;
+        }
+        emitEvent(INFO, "GattServer gestartet");
+        int writeProperty = BluetoothGattCharacteristic.PROPERTY_WRITE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            writeProperty |= BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE;
+        }
+        serverCharacteristic = new BluetoothGattCharacteristic(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID, writeProperty | BluetoothGattCharacteristic.PROPERTY_NOTIFY, BluetoothGattCharacteristic.PERMISSION_WRITE);
+
+        BluetoothGattService service = new BluetoothGattService(NetworkManager.KITTY_CARDS_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
+//      TODO ist dass sinnvoll?
+//        BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
+//                NetworkManager.CCCD_UUID,
+//                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
+//        );
+//        serverCharacteristic.addDescriptor(cccd);
+
+        service.addCharacteristic(serverCharacteristic);
+        bluetoothGattServer.addService(service);
     }
 
     private void startAdvertising() {
@@ -170,43 +205,15 @@ public class BleHost {
                 advertiseCallback
         );
         // TODO: Call disconnect in GameController/UI if game is paused or left, to save battery
-    }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private void startGattServer() {
-        bluetoothGattServer = bluetoothManager.openGattServer(context, gattServerCallback);
-        if (bluetoothGattServer == null) return; // TODO: Error handling (e.g. Bluetooth not available, disabled or permission missing)
-
-        int writeProperty = BluetoothGattCharacteristic.PROPERTY_WRITE;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            writeProperty |= BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE;
-        }
-        serverCharacteristic = new BluetoothGattCharacteristic(
-                NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID,
-                writeProperty | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
-                BluetoothGattCharacteristic.PERMISSION_WRITE
-        );
-
-        BluetoothGattService service = new BluetoothGattService(
-                NetworkManager.KITTY_CARDS_SERVICE_UUID,
-                BluetoothGattService.SERVICE_TYPE_PRIMARY
-        );
-//      TODO ist dass sinnvoll?
-//        BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
-//                NetworkManager.CCCD_UUID,
-//                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
-//        );
-//        serverCharacteristic.addDescriptor(cccd);
-
-        service.addCharacteristic(serverCharacteristic);
-        bluetoothGattServer.addService(service);
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void selectGuest(NetworkDevice guest) {
         networkManager.handler.post(() -> {
             if (!connectedGuests.contains(guest) || bluetoothAdapter == null || bluetoothGattServer == null) {
-                return; // TODO: Exception/Error handling: The selected guest is not in the list of connected guests
+                emitEvent(ERROR, "Gast-Auswahl fehlgeschlagen (nicht verbunden)");
+                return;
             }
 
             selectedGuestDevice = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
@@ -247,7 +254,8 @@ public class BleHost {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void sendGameChange(GameAction action) {
         if (bluetoothGattServer == null || serverCharacteristic == null || selectedGuestDevice == null) {
-            return; // TODO: Exception/return?
+            emitEvent(ERROR, "Senden nicht möglich: kein aktiver Gast");
+            return;
         }
         byte[] data = networkManager.protocolEngine.encodeGameAction(action);
 
@@ -272,4 +280,28 @@ public class BleHost {
             bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false);
         }
     }
+
+    private void emitEvent(NetworkEvent.NetworkMessageType type, String msg) {
+        networkManager.emitEvent(type, "BleHost", msg);
+    }
+
+    private String advertiseErrorText(int code) {
+        return switch (code) {
+            case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED -> "Advertising läuft bereits";
+
+            case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE ->
+                    "Advertise-Daten zu groß (UUID / Name / Payload)";
+
+            case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED ->
+                    "Advertising nicht unterstützt";
+
+            case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR -> "Interner Bluetooth Fehler";
+
+            case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS ->
+                    "Zu viele aktive Advertiser";
+
+            default -> "Unbekannter Advertising Fehler (" + code + ")";
+        };
+    }
+
 }

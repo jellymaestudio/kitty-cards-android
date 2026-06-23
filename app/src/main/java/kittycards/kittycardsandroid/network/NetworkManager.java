@@ -14,6 +14,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.components.IProtocolEngine;
+import kittycards.kittycardsandroid.network.event.NetworkEvent;
+import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /**
  * calls the listener methods
@@ -29,18 +31,22 @@ public class NetworkManager implements INetworkManager {
     static final long SCAN_PERIOD = 10000;
 
     private static volatile NetworkManager instance;
-
-    private final Context context;
-    private final BluetoothAdapter bluetoothAdapter;
-    private final BluetoothManager bluetoothManager;
-
-    final Handler handler = new Handler(Looper.getMainLooper());
     final IProtocolEngine protocolEngine;
-    private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
+
+    private final BleHost bleHost;
+    private final BleGuest bleGuest;
 
     private volatile Role role = Role.NOT_CONNECTED;
-    private final BleGuest bleGuest;
-    private final BleHost bleHost;
+
+    final Handler handler = new Handler(Looper.getMainLooper());
+    private final BluetoothAdapter bluetoothAdapter;
+    private final BluetoothManager bluetoothManager;
+    private final Context context;
+
+    private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
+
+    private NetworkEventListener eventListener;
+
 
     // -------------------------------------------------------------------------
     // Singleton
@@ -148,6 +154,22 @@ public class NetworkManager implements INetworkManager {
         return actionQueue.take(); // Blocks the calling thread until something is in the queue
     }
 
+    @Override
+    public void setNetworkEventListener(NetworkEventListener listener) {
+        this.eventListener = listener;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper
+    // -------------------------------------------------------------------------
+
+    protected void emitEvent(NetworkEvent.NetworkMessageType type, String source, String message) {
+        handler.post(() -> {
+            if (eventListener != null) {
+                eventListener.onNetworkEvent(new NetworkEvent(type, message, source));
+            }
+        });
+    }
     // -------------------------------------------------------------------------
     // Getter/Setter
     // -------------------------------------------------------------------------
