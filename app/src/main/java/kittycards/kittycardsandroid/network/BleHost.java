@@ -139,8 +139,8 @@ public class BleHost {
         }
         this.guestListener = listener;
         networkManager.handler.post(() -> {
-            startAdvertising();
             startGattServer();
+            startAdvertising();
         });
     }
 
@@ -149,17 +149,25 @@ public class BleHost {
         advertiser = bluetoothAdapter.getBluetoothLeAdvertiser();
         if (advertiser == null) return;
 
-        AdvertiseData data = new AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
+
+        AdvertiseData advertiseData = new AdvertiseData.Builder()
                 .addServiceUuid(new ParcelUuid(NetworkManager.KITTY_CARDS_SERVICE_UUID))
+                .build();
+
+        AdvertiseData scanResponse = new AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
                 .build();
         AdvertiseSettings settings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
                 .setTimeout(120000)
                 .build();
-
-        advertiser.startAdvertising(settings, data, advertiseCallback);
+        advertiser.startAdvertising(
+                settings,
+                advertiseData,
+                scanResponse,
+                advertiseCallback
+        );
         // TODO: Call disconnect in GameController/UI if game is paused or left, to save battery
     }
 
@@ -182,6 +190,12 @@ public class BleHost {
                 NetworkManager.KITTY_CARDS_SERVICE_UUID,
                 BluetoothGattService.SERVICE_TYPE_PRIMARY
         );
+//      TODO ist dass sinnvoll?
+//        BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
+//                NetworkManager.CCCD_UUID,
+//                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
+//        );
+//        serverCharacteristic.addDescriptor(cccd);
 
         service.addCharacteristic(serverCharacteristic);
         bluetoothGattServer.addService(service);
