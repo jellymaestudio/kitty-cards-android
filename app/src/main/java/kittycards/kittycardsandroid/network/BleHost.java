@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattService;
@@ -57,12 +58,19 @@ public class BleHost {
     private final android.bluetooth.le.AdvertiseCallback advertiseCallback = new android.bluetooth.le.AdvertiseCallback() {
         @Override
         public void onStartSuccess(android.bluetooth.le.AdvertiseSettings settingsInEffect) {
-            emitEvent(INFO, "Advertising started successfully. Host is discoverable."); // <-- NEU: Erfolg beim Advertising loggen
+            emitEvent(INFO, "Advertising started successfully. Host is discoverable.");
         }
 
+        @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
         @Override
         public void onStartFailure(int errorCode) {
-            emitEvent(ERROR, "Advertising failed: " + advertiseErrorText(errorCode));
+            emitEvent(ERROR, "Advertising failed or timed out: " + advertiseErrorText(errorCode));
+
+            networkManager.handler.post(() -> {
+                advertiser = null;
+                disconnect();
+
+            });
         }
     };
 
@@ -111,7 +119,9 @@ public class BleHost {
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
-
+            if (bluetoothGattServer == null) {
+                return; // Server bereits im Abbau / geschlossen
+            }
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
                 emitEvent(INFO, "Received write request from guest: " + device.getAddress()); // <-- NEU: Eingehender Request loggen
                 networkManager.decodeAndQueueDataSafe(value);
@@ -120,6 +130,23 @@ public class BleHost {
                 if (responseNeeded && bluetoothGattServer != null) {
                     bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
                 }
+            }
+        }
+
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+        @Override
+        public void onDescriptorWriteRequest(BluetoothDevice device, int requestId,
+                                             BluetoothGattDescriptor descriptor,
+                                             boolean preparedWrite, boolean responseNeeded,
+                                             int offset, byte[] value) {
+            if (NetworkManager.CCCD_UUID.equals(descriptor.getUuid())) {
+                emitEvent(INFO, "CCCD-Write von Guest erhalten: " + device.getAddress());
+                // Optional: descriptor.setValue(value) ist auf Server-Seite nicht nötig,
+                // da der GATT-Server-Stack den Wert intern verwaltet.
+            }
+
+            if (responseNeeded && bluetoothGattServer != null) {
+                bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
             }
         }
 
@@ -175,11 +202,11 @@ public class BleHost {
 
         BluetoothGattService service = new BluetoothGattService(NetworkManager.KITTY_CARDS_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 //      TODO is this reasonable?
-//        BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
-//                NetworkManager.CCCD_UUID,
-//                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
-//        );
-//        serverCharacteristic.addDescriptor(cccd);
+        BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
+                NetworkManager.CCCD_UUID,
+                BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
+        );
+        serverCharacteristic.addDescriptor(cccd);
 
         service.addCharacteristic(serverCharacteristic);
         bluetoothGattServer.addService(service);
@@ -244,21 +271,38 @@ public class BleHost {
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     public void disconnect() {
         networkManager.handler.post(() -> {
-            emitEvent(INFO, "Host is stopping advertising and closing GATT server"); // <-- NEU: Manueller Host-Shutdown
+            emitEvent(INFO, "Host is stopping advertising and closing GATT server");
             outgoingQueue.clear();
             notificationInProgress = false;
 
             if (advertiser != null) {
-                advertiser.stopAdvertising(advertiseCallback);
+                try {
+                    advertiser.stopAdvertising(advertiseCallback);
+                } catch (IllegalStateException e) {
+                    // Falls das OS intern schon dichtgemacht hat
+                }
                 advertiser = null;
             }
-            if (bluetoothGattServer != null) {
-                bluetoothGattServer.close();
-                bluetoothGattServer = null;
+
+
+            if (bluetoothGattServer != null && bluetoothAdapter != null) {
+                for (NetworkDevice guest : connectedGuests) {
+                    BluetoothDevice device = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
+                    bluetoothGattServer.cancelConnection(device);
+                }
             }
-            connectedGuests.clear();
-            selectedGuestDevice = null;
-            serverCharacteristic = null;
+
+
+            networkManager.handler.postDelayed(() -> {
+                if (bluetoothGattServer != null) {
+                    bluetoothGattServer.close();
+                    bluetoothGattServer = null;
+                }
+                connectedGuests.clear();
+                selectedGuestDevice = null;
+                serverCharacteristic = null;
+                emitEvent(INFO, "GATT server closed and resources cleared successfully");
+            }, 200);
         });
     }
 

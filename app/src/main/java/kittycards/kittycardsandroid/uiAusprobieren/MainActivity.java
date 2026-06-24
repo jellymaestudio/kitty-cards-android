@@ -120,12 +120,12 @@ public class MainActivity extends AppCompatActivity {
             switch (networkManager.getRole()) {
                 case GUEST -> {
                     statusTextView.setText("Verbinde mit: " + targetDevice.deviceAddress());
-                    dataLogTextView.append("\n[System] Sende Verbindungsanfrage an " + targetDevice.deviceAddress());
+                    //dataLogTextView.append("\n[System] Sende Verbindungsanfrage an " + targetDevice.deviceAddress());
                     networkManager.confirmRoom(targetDevice);
                 }
                 case HOST -> {
                     statusTextView.setText("Akzeptiere Gast: " + targetDevice.deviceAddress());
-                    dataLogTextView.append("\n[System] Wähle Gast aus und schließe Lobby für andere: " + targetDevice.deviceAddress());
+                    //dataLogTextView.append("\n[System] Wähle Gast aus und schließe Lobby für andere: " + targetDevice.deviceAddress());
                     networkManager.selectGuest(targetDevice);
                 }
                 case NOT_CONNECTED -> {
@@ -142,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
                         null, null, -1, -1, 1
                 );
                 networkManager.sendGameChange(dummyAction);
-                dataLogTextView.append("\n📤 [Gesendet] Typ: " + dummyAction.type() + " | ContextInt: " + dummyAction.contextSensitiveInt());
+                //dataLogTextView.append("\n📤 [Gesendet] Typ: " + dummyAction.type() + " | ContextInt: " + dummyAction.contextSensitiveInt());
             } catch (Exception e) {
                 showError("MainActivity", "Sende-Fehler: " + e.getMessage());
             }
@@ -155,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
             discoveredDevices.clear();
             errorTextView.setVisibility(View.GONE);
             statusTextView.setText("Status: Getrennt");
-            dataLogTextView.append("\n🔌 [System] Verbindung manuell getrennt.");
+            //dataLogTextView.append("\n🔌 [System] Verbindung manuell getrennt.");
             btnConfirm.setEnabled(false); // <-- DEAKTIVIERT: Nach Trennung zurücksetzen
         });
 

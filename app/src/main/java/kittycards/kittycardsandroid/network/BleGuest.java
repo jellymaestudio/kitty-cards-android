@@ -95,9 +95,22 @@ public class BleGuest {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             networkManager.handler.post(() -> {
+                if (status == 133) {
+                    emitEvent(WARNING, "GATT_ERROR (133) - Retry wird versucht");
+                    if (activeGattConnection != null) {
+                        activeGattConnection.close();
+                    }
+                    activeGattConnection = null;
+                    BluetoothDevice device = gatt.getDevice();
+                    networkManager.handler.postDelayed(() -> {
+                        activeGattConnection = device.connectGatt(context, false, gattCallback);
+                    }, 300);
+                    return;
+                }
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     connected = false;
                     emitEvent(ERROR, "Connection error, status: " + status);
+
 
                     if (activeGattConnection != null) {
                         activeGattConnection.close();
@@ -116,7 +129,8 @@ public class BleGuest {
 
 
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    // TODO: Dealing with a loss of connection (e.g. inform GameController/UI)
+                    gatt.close();
+                    if (activeGattConnection == gatt) activeGattConnection = null;
                     connected = false;
                     emitEvent(WARNING, "Disconnected from host"); // <-- NEU: Saubere Trennung loggen
                     networkManager.handler.removeCallbacks(writeTimeoutRunnable);
