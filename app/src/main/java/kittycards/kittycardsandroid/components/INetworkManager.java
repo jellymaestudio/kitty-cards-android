@@ -21,6 +21,10 @@ import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 public interface INetworkManager {
 
     //TODO dafür sorgen, dass empfangene Actions erst über fetchAction auslesbar sind, wenn wir eine Antwort vom senden haben.
+    //TODO Smoother wechsel zwischen Host und Client (hier gibts denke ich noch einige Fehler)
+    //TODO wenn gast bestätigt, aber host noch nicht, kann er schon aktionen empfangen
+    //TODO wenn der host advertised und es nochmal getriggert wird, passiert ganz viel unnötige, am ende ist scheinbar
+    // der gatt server zu, aber beim erneuten drücken gehts immer noch nicht
     /**
      * To be called when the host wishes to open a Room for a new match.
      * Starts BLE advertising to make this device discoverable to potential guests.
