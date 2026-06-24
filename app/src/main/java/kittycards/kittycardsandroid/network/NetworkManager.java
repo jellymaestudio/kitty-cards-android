@@ -61,6 +61,13 @@ public class NetworkManager implements INetworkManager {
         this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
     }
 
+    /**
+     * Returns the singleton instance of NetworkManager.
+     * Must be initialized with a Context first.
+     *
+     * @param context application context used for BLE setup
+     * @return singleton instance
+     */
     public static NetworkManager getInstance(Context context) {
         if (instance == null) {
             synchronized (NetworkManager.class) {
@@ -72,6 +79,12 @@ public class NetworkManager implements INetworkManager {
         return instance;
     }
 
+    /**
+     * Returns the already initialized singleton instance.
+     *
+     * @return NetworkManager instance
+     * @throws IllegalStateException if not initialized via getInstance(Context)
+     */
     public static NetworkManager getInstance() {
         if (instance == null) {
             throw new IllegalStateException("NetworkManager not initialized. Call getInstance(Context) first.");
@@ -83,7 +96,12 @@ public class NetworkManager implements INetworkManager {
     // BLE data receiving (Shared for Host and Guest)
     // -------------------------------------------------------------------------
 
-    // BLE background thread calls this when data arrives
+    /**
+     * Decodes raw BLE byte payload into a GameAction and enqueues it for consumption.
+     * Thread-safe and intended to be called from BLE callback threads.
+     *
+     * @param bytes raw BLE payload
+     */
     void decodeAndQueueDataSafe(byte[] bytes) {
         GameAction action = protocolEngine.decodeGameAction(bytes);
         try {
@@ -98,16 +116,18 @@ public class NetworkManager implements INetworkManager {
     // INetworkManager
     // -------------------------------------------------------------------------
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
+        if (role == Role.GUEST) disconnect();
         role = Role.HOST;
         bleHost.hostMatch(listener);
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void joinMatch(OnDeviceFoundListener listener) {
+        if (role == Role.HOST) disconnect();
         role = Role.GUEST;
         bleGuest.joinMatch(listener);
     }
@@ -125,7 +145,7 @@ public class NetworkManager implements INetworkManager {
     }
 
 
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void disconnect() {
         switch (role) {
@@ -149,6 +169,7 @@ public class NetworkManager implements INetworkManager {
         }
     }
 
+
     @Override
     public GameAction fetchNextAction() throws InterruptedException {
         return actionQueue.take(); // Blocks the calling thread until something is in the queue
@@ -163,6 +184,14 @@ public class NetworkManager implements INetworkManager {
     // Helper
     // -------------------------------------------------------------------------
 
+    /**
+     * Emits a network event to the registered listener on the main thread.
+     * Used by BLE components to forward status, warnings and errors to UI layer.
+     *
+     * @param type event severity/type
+     * @param source origin of the event (e.g. BleHost, BleGuest)
+     * @param message human-readable message
+     */
     protected void emitEvent(NetworkEvent.NetworkMessageType type, String source, String message) {
         handler.post(() -> {
             if (eventListener != null) {
@@ -174,7 +203,10 @@ public class NetworkManager implements INetworkManager {
     // Getter/Setter
     // -------------------------------------------------------------------------
 
-
+    /**
+     * Returns the player's current role (HOST, GUEST, NOT_CONNECTED)
+     * @return the role
+     */
     public Role getRole() {
         return role;
     }
