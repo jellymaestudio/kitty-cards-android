@@ -57,7 +57,7 @@ public class BleHost {
     private final android.bluetooth.le.AdvertiseCallback advertiseCallback = new android.bluetooth.le.AdvertiseCallback() {
         @Override
         public void onStartSuccess(android.bluetooth.le.AdvertiseSettings settingsInEffect) {
-            // Host is now discoverable by other devices during scanning
+            emitEvent(INFO, "Advertising started successfully. Host is discoverable."); // <-- NEU: Erfolg beim Advertising loggen
         }
 
         @Override
@@ -95,6 +95,7 @@ public class BleHost {
                         }
                     }
                     if (selectedGuestDevice != null && selectedGuestDevice.getAddress().equals(device.getAddress())) {
+                        emitEvent(WARNING, "Active game partner disconnected: " + device.getAddress()); // <-- NEU: Aktiver Partner weg
                         selectedGuestDevice = null;
                         outgoingQueue.clear();
                         notificationInProgress = false;
@@ -112,6 +113,7 @@ public class BleHost {
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
 
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
+                emitEvent(INFO, "Received write request from guest: " + device.getAddress()); // <-- NEU: Eingehender Request loggen
                 networkManager.decodeAndQueueDataSafe(value);
 
                 // A server MUST acknowledge to the client that the data was received
@@ -126,6 +128,8 @@ public class BleHost {
         public void onNotificationSent(BluetoothDevice device, int status) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 emitEvent(ERROR, "Notification failed: " + status);
+            } else {
+                emitEvent(INFO, "Notification successfully sent to " + device.getAddress()); // <-- NEU: Notification gesendet
             }
             networkManager.handler.post(() -> {
                 notificationInProgress = false;
@@ -148,6 +152,7 @@ public class BleHost {
             return;
         }
         this.guestListener = listener;
+        emitEvent(INFO, "Starting match hosting..."); // <-- NEU: Startvorgang eingeleitet
         networkManager.handler.post(() -> {
             startGattServer();
             startAdvertising();
@@ -178,6 +183,7 @@ public class BleHost {
 
         service.addCharacteristic(serverCharacteristic);
         bluetoothGattServer.addService(service);
+        emitEvent(INFO, "Custom BLE Service and Characteristic added to GATT Server"); // <-- NEU: Service-Struktur steht
     }
 
     private void startAdvertising() {
@@ -198,6 +204,8 @@ public class BleHost {
                 .setConnectable(true)
                 .setTimeout(120000)
                 .build();
+
+        emitEvent(INFO, "Starting BLE Advertisement configuration..."); // <-- NEU: Initiiere Advertising
         advertiser.startAdvertising(
                 settings,
                 advertiseData,
@@ -216,10 +224,12 @@ public class BleHost {
                 return;
             }
 
+            emitEvent(INFO, "Selecting guest as active partner: " + guest.deviceAddress()); // <-- NEU: Partner ausgewählt
             selectedGuestDevice = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
 
             for (NetworkDevice other : new ArrayList<>(connectedGuests)) {
                 if (!other.equals(guest)) {
+                    emitEvent(INFO, "Disconnecting non-selected guest: " + other.deviceAddress()); // <-- NEU: Andere Clients kicken
                     BluetoothDevice device = bluetoothAdapter.getRemoteDevice(other.deviceAddress());
                     bluetoothGattServer.cancelConnection(device);
                 }
@@ -234,6 +244,7 @@ public class BleHost {
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     public void disconnect() {
         networkManager.handler.post(() -> {
+            emitEvent(INFO, "Host is stopping advertising and closing GATT server"); // <-- NEU: Manueller Host-Shutdown
             outgoingQueue.clear();
             notificationInProgress = false;
 
@@ -261,6 +272,7 @@ public class BleHost {
 
         networkManager.handler.post(() -> {
             outgoingQueue.add(data);
+            emitEvent(INFO, "Notification added to queue. Queue size: " + outgoingQueue.size()); // <-- NEU: Queue-Status beim Host
             processNextNotification();
         });
     }
@@ -273,6 +285,9 @@ public class BleHost {
 
         notificationInProgress = true;
         byte[] data = outgoingQueue.poll();
+
+        emitEvent(INFO, "Sending notification to guest..."); // <-- NEU: Sendevorgang startet
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false, data);
         } else {
