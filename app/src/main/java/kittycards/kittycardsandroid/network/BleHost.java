@@ -55,9 +55,9 @@ public class BleHost {
     private final Queue<byte[]> outgoingQueue = new LinkedList<>();
     private boolean notificationInProgress = false;
 
-    private final android.bluetooth.le.AdvertiseCallback advertiseCallback = new android.bluetooth.le.AdvertiseCallback() {
+    private final AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
         @Override
-        public void onStartSuccess(android.bluetooth.le.AdvertiseSettings settingsInEffect) {
+        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
             emitEvent(INFO, "Advertising started successfully. Host is discoverable.");
         }
 
@@ -65,12 +65,7 @@ public class BleHost {
         @Override
         public void onStartFailure(int errorCode) {
             emitEvent(ERROR, "Advertising failed or timed out: " + advertiseErrorText(errorCode));
-
-            networkManager.handler.post(() -> {
-                advertiser = null;
-                disconnect();
-
-            });
+            networkManager.handler.post(BleHost.this::disconnect);
         }
     };
 
@@ -107,7 +102,6 @@ public class BleHost {
                         selectedGuestDevice = null;
                         outgoingQueue.clear();
                         notificationInProgress = false;
-                        // TODO networkManager.handleRemoteDisconnect(); ?
                         // TODO: Inform GameController/UI that the active game partner lost connection
                     }
                 }
@@ -120,14 +114,23 @@ public class BleHost {
         @Override
         public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
             if (bluetoothGattServer == null) {
-                return; // Server bereits im Abbau / geschlossen
+                return;
             }
             if (NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID.equals(characteristic.getUuid())) {
-                emitEvent(INFO, "Received write request from guest: " + device.getAddress()); // <-- NEU: Eingehender Request loggen
+
+                if (selectedGuestDevice == null || !selectedGuestDevice.getAddress().equals(device.getAddress())) {
+                    emitEvent(WARNING, "Ignored write request from unselected guest: " + device.getAddress());
+
+                    if (responseNeeded) {
+                        bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_WRITE_NOT_PERMITTED, offset, null);
+                    }
+                    return;
+                }
+                if (value == null) emitEvent(ERROR, "Received empty write payload");
+
                 networkManager.decodeAndQueueDataSafe(value);
 
-                // A server MUST acknowledge to the client that the data was received
-                if (responseNeeded && bluetoothGattServer != null) {
+                if (responseNeeded) {
                     bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
                 }
             }
@@ -139,11 +142,7 @@ public class BleHost {
                                              BluetoothGattDescriptor descriptor,
                                              boolean preparedWrite, boolean responseNeeded,
                                              int offset, byte[] value) {
-            if (NetworkManager.CCCD_UUID.equals(descriptor.getUuid())) {
-                emitEvent(INFO, "CCCD-Write von Guest erhalten: " + device.getAddress());
-                // Optional: descriptor.setValue(value) ist auf Server-Seite nicht nötig,
-                // da der GATT-Server-Stack den Wert intern verwaltet.
-            }
+
 
             if (responseNeeded && bluetoothGattServer != null) {
                 bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
@@ -155,8 +154,6 @@ public class BleHost {
         public void onNotificationSent(BluetoothDevice device, int status) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 emitEvent(ERROR, "Notification failed: " + status);
-            } else {
-                emitEvent(INFO, "Notification successfully sent to " + device.getAddress()); // <-- NEU: Notification gesendet
             }
             networkManager.handler.post(() -> {
                 notificationInProgress = false;
@@ -179,7 +176,11 @@ public class BleHost {
             return;
         }
         this.guestListener = listener;
-        emitEvent(INFO, "Starting match hosting..."); // <-- NEU: Startvorgang eingeleitet
+        if (advertiser != null || bluetoothGattServer != null) {
+            emitEvent(WARNING, "Hosting läuft bereits, Anfrage ignoriert");
+            return;
+        }
+        emitEvent(INFO, "Starting match hosting...");
         networkManager.handler.post(() -> {
             startGattServer();
             startAdvertising();
@@ -193,7 +194,7 @@ public class BleHost {
             emitEvent(ERROR, "GattServer could not be opened");
             return;
         }
-        emitEvent(INFO, "GattServer started");
+
         int writeProperty = BluetoothGattCharacteristic.PROPERTY_WRITE;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             writeProperty |= BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE;
@@ -201,7 +202,6 @@ public class BleHost {
         serverCharacteristic = new BluetoothGattCharacteristic(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID, writeProperty | BluetoothGattCharacteristic.PROPERTY_NOTIFY, BluetoothGattCharacteristic.PERMISSION_WRITE);
 
         BluetoothGattService service = new BluetoothGattService(NetworkManager.KITTY_CARDS_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
-//      TODO is this reasonable?
         BluetoothGattDescriptor cccd = new BluetoothGattDescriptor(
                 NetworkManager.CCCD_UUID,
                 BluetoothGattDescriptor.PERMISSION_READ | BluetoothGattDescriptor.PERMISSION_WRITE
@@ -209,8 +209,9 @@ public class BleHost {
         serverCharacteristic.addDescriptor(cccd);
 
         service.addCharacteristic(serverCharacteristic);
-        bluetoothGattServer.addService(service);
-        emitEvent(INFO, "Custom BLE Service and Characteristic added to GATT Server"); // <-- NEU: Service-Struktur steht
+        boolean success = bluetoothGattServer.addService(service);
+
+        if (!success) emitEvent(ERROR, "Failed to add BLE service");
     }
 
     private void startAdvertising() {
@@ -232,7 +233,6 @@ public class BleHost {
                 .setTimeout(120000)
                 .build();
 
-        emitEvent(INFO, "Starting BLE Advertisement configuration..."); // <-- NEU: Initiiere Advertising
         advertiser.startAdvertising(
                 settings,
                 advertiseData,
@@ -256,7 +256,6 @@ public class BleHost {
 
             for (NetworkDevice other : new ArrayList<>(connectedGuests)) {
                 if (!other.equals(guest)) {
-                    emitEvent(INFO, "Disconnecting non-selected guest: " + other.deviceAddress()); // <-- NEU: Andere Clients kicken
                     BluetoothDevice device = bluetoothAdapter.getRemoteDevice(other.deviceAddress());
                     bluetoothGattServer.cancelConnection(device);
                 }
@@ -284,14 +283,12 @@ public class BleHost {
                 advertiser = null;
             }
 
-
             if (bluetoothGattServer != null && bluetoothAdapter != null) {
                 for (NetworkDevice guest : connectedGuests) {
                     BluetoothDevice device = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
                     bluetoothGattServer.cancelConnection(device);
                 }
             }
-
 
             networkManager.handler.postDelayed(() -> {
                 if (bluetoothGattServer != null) {
@@ -316,7 +313,6 @@ public class BleHost {
 
         networkManager.handler.post(() -> {
             outgoingQueue.add(data);
-            emitEvent(INFO, "Notification added to queue. Queue size: " + outgoingQueue.size()); // <-- NEU: Queue-Status beim Host
             processNextNotification();
         });
     }
@@ -329,8 +325,6 @@ public class BleHost {
 
         notificationInProgress = true;
         byte[] data = outgoingQueue.poll();
-
-        emitEvent(INFO, "Sending notification to guest..."); // <-- NEU: Sendevorgang startet
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             bluetoothGattServer.notifyCharacteristicChanged(selectedGuestDevice, serverCharacteristic, false, data);

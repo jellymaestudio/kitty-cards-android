@@ -21,10 +21,11 @@ import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 public interface INetworkManager {
 
     //TODO dafür sorgen, dass empfangene Actions erst über fetchAction auslesbar sind, wenn wir eine Antwort vom senden haben.
-    //TODO Smoother wechsel zwischen Host und Client (hier gibts denke ich noch einige Fehler)
-    //TODO wenn gast bestätigt, aber host noch nicht, kann er schon aktionen empfangen
-    //TODO wenn der host advertised und es nochmal getriggert wird, passiert ganz viel unnötige, am ende ist scheinbar
-    // der gatt server zu, aber beim erneuten drücken gehts immer noch nicht
+    //TODO wenn der Client mehrmals bestätigt/subscribed, bekommt er nachrichten vom host mehrmals
+    //TODO Empfangsbestätigung für nachrichten ausgeben
+    //TODO Host Guest setup, Host disconnected, guest sendet, fehler ist write failed mit status 1, soll das so?
+    //TODO Host guest setup, Host hat aber guest noch NICHT ausgewählt.
+    //  Host disconnected und startet neu -> gast muss nicht neu suchen/bestätigen -> kann direkt annehmen
     /**
      * To be called when the host wishes to open a Room for a new match.
      * Starts BLE advertising to make this device discoverable to potential guests.
@@ -79,21 +80,22 @@ public interface INetworkManager {
     void sendGameChange(GameAction action);
 
     /**
-     * Retrieves the next game action received from the remote device.
-     * Pauses until an action becomes available.
+     * Retrieves the next received GameAction from the internal queue.
+     * This method blocks until an action becomes available.
+     * <p>
+     * Intended for game loop consumption.
      *
-     * @return the retrieved GameAction object
-     * @throws InterruptedException If the blocked thread is interrupted from outside
-     *                              (e.g. due to the app being closed or a loss of connection),
-     *                              in order to end the wait prematurely.
+     * @return next GameAction received via BLE
+     * @throws InterruptedException if thread is interrupted while waiting
      */
+
     GameAction fetchNextAction() throws InterruptedException;
 
     /**
-     * Sets the network event listener, which gets called upon a network event (e.g. a connect or disconnect notification or a bluetooth error.
-     * Meant to be set by the UI.
+     * Registers a listener for network events.
+     * Only one listener is active at a time; replacing the previous one.
      *
-     * @param listener the listener that defines the behavior when a network event occurs
+     * @param listener listener receiving NetworkEvent updates on main thread
      */
     void setNetworkEventListener(NetworkEventListener listener);
 

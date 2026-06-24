@@ -75,8 +75,8 @@ public class MainActivity extends AppCompatActivity {
         btnHost.setOnClickListener(v -> {
             errorTextView.setVisibility(View.GONE);
             String deviceName = BluetoothAdapter.getDefaultAdapter().getName();
-            statusTextView.setText("Rolle: HOST (Warte auf Gäste...)");
-            dataLogTextView.append("\n[System] Starte Hosting als: " + deviceName);
+//            statusTextView.setText("Rolle: HOST (Warte auf Gäste...)");
+            //           dataLogTextView.append("\n[System] Starte Hosting als: " + deviceName);
             btnConfirm.setEnabled(false); // Erstmal deaktivieren, bis jemand kommt
 
             networkManager.hostMatch(guests -> runOnUiThread(() -> {
@@ -84,8 +84,8 @@ public class MainActivity extends AppCompatActivity {
                 discoveredDevices.addAll(guests);
                 if (!guests.isEmpty()) {
                     targetDevice = guests.get(0);
-                    dataLogTextView.append("\n[Scanner] Gast gefunden: " + targetDevice.deviceAddress());
-                    statusTextView.setText("Gast verfügbar! Bitte 'Bestätigen' klicken.");
+                    //                   dataLogTextView.append("\n[Scanner] Gast gefunden: " + targetDevice.deviceAddress());
+//                    statusTextView.setText("Gast verfügbar! Bitte 'Bestätigen' klicken.");
                     btnConfirm.setEnabled(true); // <-- HIER AKTIVIERT: Gast gefunden!
                 }
             }));
@@ -94,8 +94,8 @@ public class MainActivity extends AppCompatActivity {
         // 2. NACH MATCHES SUCHEN (GUEST)
         btnJoin.setOnClickListener(v -> {
             errorTextView.setVisibility(View.GONE);
-            statusTextView.setText("Rolle: GUEST (Suche nach Räumen...)");
-            dataLogTextView.append("\n[System] Starte BLE-Scan nach Räumen...");
+            //           statusTextView.setText("Rolle: GUEST (Suche nach Räumen...)");
+            //           dataLogTextView.append("\n[System] Starte BLE-Scan nach Räumen...");
             btnConfirm.setEnabled(false); // Erstmal deaktivieren, bis gescannt wurde
 
             networkManager.joinMatch(rooms -> runOnUiThread(() -> {
@@ -103,8 +103,8 @@ public class MainActivity extends AppCompatActivity {
                 discoveredDevices.addAll(rooms);
                 if (!rooms.isEmpty()) {
                     targetDevice = rooms.get(0);
-                    dataLogTextView.append("\n[Scanner] Raum gefunden: " + targetDevice.deviceAddress());
-                    statusTextView.setText("Raum gefunden! Bitte 'Bestätigen' klicken.");
+                    //               dataLogTextView.append("\n[Scanner] Raum gefunden: " + targetDevice.deviceAddress());
+                    //                statusTextView.setText("Raum gefunden! Bitte 'Bestätigen' klicken.");
                     btnConfirm.setEnabled(true); // <-- HIER AKTIVIERT: Raum gefunden!
                 }
             }));
@@ -113,23 +113,23 @@ public class MainActivity extends AppCompatActivity {
         // 3. VERBINDUNG BESTÄTIGEN ODER GAST AUSWÄHLEN
         btnConfirm.setOnClickListener(v -> {
             if (targetDevice == null) {
-                statusTextView.setText("Fehler: Kein Gerät in Reichweite!");
+                //            statusTextView.setText("Fehler: Kein Gerät in Reichweite!");
                 return;
             }
 
             switch (networkManager.getRole()) {
                 case GUEST -> {
-                    statusTextView.setText("Verbinde mit: " + targetDevice.deviceAddress());
+                    //                 statusTextView.setText("Verbinde mit: " + targetDevice.deviceAddress());
                     //dataLogTextView.append("\n[System] Sende Verbindungsanfrage an " + targetDevice.deviceAddress());
                     networkManager.confirmRoom(targetDevice);
                 }
                 case HOST -> {
-                    statusTextView.setText("Akzeptiere Gast: " + targetDevice.deviceAddress());
+                    //                 statusTextView.setText("Akzeptiere Gast: " + targetDevice.deviceAddress());
                     //dataLogTextView.append("\n[System] Wähle Gast aus und schließe Lobby für andere: " + targetDevice.deviceAddress());
                     networkManager.selectGuest(targetDevice);
                 }
                 case NOT_CONNECTED -> {
-                    statusTextView.setText("Fehler: Keine Rolle zugewiesen!");
+                    //                  statusTextView.setText("Fehler: Keine Rolle zugewiesen!");
                 }
             }
         });
@@ -154,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
             targetDevice = null;
             discoveredDevices.clear();
             errorTextView.setVisibility(View.GONE);
-            statusTextView.setText("Status: Getrennt");
+            //       statusTextView.setText("Status: Getrennt");
             //dataLogTextView.append("\n🔌 [System] Verbindung manuell getrennt.");
             btnConfirm.setEnabled(false); // <-- DEAKTIVIERT: Nach Trennung zurücksetzen
         });
@@ -169,15 +169,15 @@ public class MainActivity extends AppCompatActivity {
                     // Blockiert, bis Daten über BLE eingehen
                     GameAction action = networkManager.fetchNextAction();
                     if (action != null) {
-                    runOnUiThread(() -> dataLogTextView.append(
-                                "\n📥 [Empfangen] Typ: " + action.type() + " | ContextInt: " + action.contextSensitiveInt()
-                    ));
+                                     runOnUiThread(() -> dataLogTextView.append(
+                                                    "\n📥 [Empfangen] Typ: " + action.type() + " | ContextInt: " + action.contextSensitiveInt()
+                                       ));
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    runOnUiThread(() -> dataLogTextView.append("\n❌ [Fehler beim Lesen]: " + e.getMessage()));
+                    //           runOnUiThread(() -> dataLogTextView.append("\n❌ [Fehler beim Lesen]: " + e.getMessage()));
                 }
             }
         }).start();
