@@ -20,6 +20,7 @@ import kittycards.kittycardsandroid.network.event.NetworkEventListener;
  */
 public interface INetworkManager {
 
+    //TODO dafür sorgen, dass empfangene Actions erst über fetchAction auslesbar sind, wenn wir eine Antwort vom senden haben.
     /**
      * To be called when the host wishes to open a Room for a new match.
      * Starts BLE advertising to make this device discoverable to potential guests.
