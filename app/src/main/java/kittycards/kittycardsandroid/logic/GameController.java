@@ -142,17 +142,15 @@ public class GameController implements IGameController {
             return;
         }
 
-        applySelectCard(player, card);
-
         sendGameAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
+        applySelectCard(player, card);
         notifyStateChanged();
     }
 
     @Override
     public void unselectCard(Player player) {
-        applyUnselectCard(player);
-
         sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        applyUnselectCard(player);
         notifyStateChanged();
     }
 
@@ -165,8 +163,6 @@ public class GameController implements IGameController {
 
         Card selectedCard = player.getSelectedCard();
 
-        applyPlayCard(player, selectedCard, row, column);
-
         sendGameAction(new GameAction(
                 GameAction.ActionType.PLAY_CARD,
                 selectedCard,
@@ -174,6 +170,7 @@ public class GameController implements IGameController {
                 row
         ));
 
+        applyPlayCard(player, selectedCard, row, column);
         notifyStateChanged();
     }
 
@@ -186,13 +183,12 @@ public class GameController implements IGameController {
 
         Card card = generateCard();
 
-        applyDrawCard(player, card);
-
         sendGameAction(new GameAction(
                 GameAction.ActionType.DRAW_CARD,
                 card
         ));
 
+        applyDrawCard(player, card);
         notifyStateChanged();
     }
 
