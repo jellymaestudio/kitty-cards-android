@@ -4,6 +4,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
+
 public class MatchTest {
 
     @Test
@@ -202,6 +204,94 @@ public class MatchTest {
         playerOne.addWin();
 
         match.startNextRound();
+
+        assertEquals(MatchStatus.FINISHED, match.getMatchStatus());
+    }
+
+    @Test
+    public void startNextRoundWithFieldColorsShouldUseGivenBoardColors() {
+        Match match = createMatch();
+
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        match.startNextRound(colors, match.getPlayerOne());
+
+        assertEquals(colors, match.getGameState().getBoard().getFieldColors());
+    }
+
+    @Test
+    public void startNextRoundWithFieldColorsShouldSetGivenStartingPlayer() {
+        Match match = createMatch();
+
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        match.startNextRound(colors, match.getPlayerTwo());
+
+        assertEquals(match.getPlayerTwo(), match.getGameState().getStartingPlayer());
+        assertEquals(match.getPlayerTwo(), match.getGameState().getCurrentPlayer());
+    }
+
+    @Test
+    public void startNextRoundWithFieldColorsShouldAddWinToRoundWinner() {
+        Player playerOne = new Player(1, "Player One");
+        Player playerTwo = new Player(2, "Player Two");
+        Match match = new Match(playerOne, playerTwo);
+
+        playerOne.addScore(10);
+
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        match.startNextRound(colors, playerTwo);
+
+        assertEquals(1, playerOne.getWins());
+    }
+
+    @Test
+    public void startNextRoundWithFieldColorsShouldSetMatchStatusToFinishedIfMatchIsFinished() {
+        Match match = createMatch();
+
+        match.getPlayerOne().addWin();
+        match.getPlayerOne().addWin();
+
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        match.startNextRound(colors, match.getPlayerTwo());
 
         assertEquals(MatchStatus.FINISHED, match.getMatchStatus());
     }

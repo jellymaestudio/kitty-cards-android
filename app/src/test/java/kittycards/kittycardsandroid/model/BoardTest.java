@@ -4,6 +4,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
+
 public class BoardTest {
 
     @Test
@@ -18,7 +20,7 @@ public class BoardTest {
     }
 
     @Test
-    public void constructorShouldSetCenterFieldToWhite() {
+    public void constructorShouldSetCenterFieldToGrey() {
         Board board = new Board();
 
         assertEquals(GameColor.GREY, board.getField(1, 1).getColor());
@@ -50,7 +52,7 @@ public class BoardTest {
     }
 
     @Test
-    public void constructorShouldCreateFourWhitePlayableFields() {
+    public void constructorShouldCreateFourGreyPlayableFields() {
         Board board = new Board();
         int whitePlayableFields = 0;
 
@@ -84,6 +86,53 @@ public class BoardTest {
     }
 
     @Test
+    public void constructorWithFieldColorsShouldUseGivenColors() {
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        Board board = new Board(colors);
+
+        assertEquals(colors, board.getFieldColors());
+    }
+
+    @Test
+    public void constructorWithFieldColorsShouldSetCenterFieldToGrey() {
+        Board board = new Board(List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        ));
+
+        assertEquals(GameColor.GREY, board.getField(1, 1).getColor());
+    }
+
+    @Test
+    public void constructorWithFieldColorsShouldThrowExceptionIfListIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> new Board(null));
+    }
+
+    @Test
+    public void constructorWithFieldColorsShouldThrowExceptionIfListHasTooFewColors() {
+        assertThrows(IllegalArgumentException.class, () -> new Board(List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN
+        )));
+    }
+
+    @Test
     public void getFieldShouldReturnCorrectField() {
         Board board = new Board();
 
@@ -91,6 +140,13 @@ public class BoardTest {
 
         assertEquals(2, field.getRow());
         assertEquals(1, field.getColumn());
+    }
+
+    @Test
+    public void getFieldColorsShouldReturnEightColors() {
+        Board board = new Board();
+
+        assertEquals(8, board.getFieldColors().size());
     }
 
     @Test

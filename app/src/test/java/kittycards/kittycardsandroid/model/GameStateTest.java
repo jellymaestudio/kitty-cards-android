@@ -4,6 +4,8 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
+
 public class GameStateTest {
 
     @Test
@@ -58,6 +60,27 @@ public class GameStateTest {
         Player startingPlayer = new Player(1, "Player One");
 
         assertThrows(NullPointerException.class, () -> new GameState(startingPlayer, null));
+    }
+
+    @Test
+    public void constructorWithFieldColorsShouldCreateBoardWithGivenColors() {
+        Player startingPlayer = new Player(1, "Player One");
+        Player secondPlayer = new Player(2, "Player Two");
+
+        List<GameColor> colors = List.of(
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN,
+                GameColor.PURPLE,
+                GameColor.GREY,
+                GameColor.YELLOW,
+                GameColor.GREEN,
+                GameColor.CYAN
+        );
+
+        GameState gameState = new GameState(startingPlayer, secondPlayer, colors);
+
+        assertEquals(colors, gameState.getBoard().getFieldColors());
     }
 
     @Test

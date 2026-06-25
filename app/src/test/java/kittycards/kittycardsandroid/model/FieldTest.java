@@ -61,6 +61,22 @@ public class FieldTest {
     }
 
     @Test
+    public void setColorShouldChangeFieldColor() {
+        Field field = new Field(GameColor.GREY, 0, 0);
+
+        field.setColor(GameColor.PURPLE);
+
+        assertEquals(GameColor.PURPLE, field.getColor());
+    }
+
+    @Test
+    public void setColorShouldThrowExceptionIfColorIsNull() {
+        Field field = new Field(GameColor.GREY, 0, 0);
+
+        assertThrows(NullPointerException.class, () -> field.setColor(null));
+    }
+
+    @Test
     public void placeCardShouldPlaceCardOnEmptyField() {
         Field field = new Field(GameColor.GREY, 0, 0);
         Card card = new Card(GameColor.PURPLE, 4);
