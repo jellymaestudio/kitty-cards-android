@@ -74,6 +74,11 @@ public class Player {
         return handCards;
     }
 
+    /**
+     * Returns the number of cards currently in the player's hand.
+     *
+     * @return the number of the player's hand cards
+     */
     public int getHandCardCount() {
         return handCards.size();
     }
