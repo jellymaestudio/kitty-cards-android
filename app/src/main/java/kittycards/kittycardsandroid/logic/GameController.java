@@ -334,7 +334,7 @@ public class GameController implements IGameController {
         GameColor cardColor = card.getColor();
         GameColor fieldColor = field.getColor();
 
-        if (fieldColor == GameColor.WHITE) {
+        if (fieldColor == GameColor.GREY) {
             return card.getValue();
         } else if (cardColor == fieldColor) {
             return card.getValue() * 2;

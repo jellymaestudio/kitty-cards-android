@@ -140,7 +140,7 @@ public class Board {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
                 if (isCenterField(row, column)) {
-                    fields[1][1] = new Field(GameColor.WHITE, row, column);
+                    fields[1][1] = new Field(GameColor.GREY, row, column);
                     continue;
                 }
 
@@ -154,13 +154,13 @@ public class Board {
         List<GameColor> fieldColors = new ArrayList<>();
         List<GameColor> coloredFields = new ArrayList<>();
 
-        coloredFields.add(GameColor.RED);
+        coloredFields.add(GameColor.PURPLE);
         coloredFields.add(GameColor.YELLOW);
         coloredFields.add(GameColor.GREEN);
-        coloredFields.add(GameColor.BLUE);
+        coloredFields.add(GameColor.CYAN);
 
         for (int i = 0; i < 4; i++) {
-            fieldColors.add(GameColor.WHITE);
+            fieldColors.add(GameColor.GREY);
             fieldColors.add(coloredFields.get((int) (Math.random() * coloredFields.size())));
         }
 

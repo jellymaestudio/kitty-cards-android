@@ -135,7 +135,7 @@ public class MatchTest {
         Player playerTwo = new Player(2, "Player Two");
         Match match = new Match(playerOne, playerTwo);
 
-        Card card = new Card(GameColor.RED, 3);
+        Card card = new Card(GameColor.PURPLE, 3);
         playerOne.addCard(card);
         playerOne.selectCard(card);
         playerOne.addScore(5);

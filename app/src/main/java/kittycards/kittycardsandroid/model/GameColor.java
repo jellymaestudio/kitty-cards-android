@@ -3,18 +3,19 @@ package kittycards.kittycardsandroid.model;
 /**
  * Represents all colors used in the game.
  * <p>
- * The colors red, yellow, green, and blue can be used for both cards and fields.
- * White is reserved exclusively for board fields, such as neutral or draw pile fields.
+ * Yellow, green, cyan and purple can be used for both cards and board fields.
+ * Grey is reserved exclusively for neutral board fields, including the center
+ * draw field.
  * </p>
  *
  * @author JellyMae
  */
 public enum GameColor {
-    RED("#EB7878"),
-    YELLOW("#EBDC78"),
-    GREEN("#BDEB78"),
-    BLUE("#78EBD6"),
-    WHITE("#FFFFFF");
+    YELLOW("#FFFCCF"),
+    GREEN("#D6FFD0"),
+    CYAN("#D0FFF7"),
+    PURPLE("#F9DEFF"),
+    GREY("#7D758D");
 
 
     private final String hexCode;
@@ -40,6 +41,6 @@ public enum GameColor {
      * @return {@code true} if this color can be used for a card, otherwise {@code false}
      */
     public boolean isCardColor() {
-        return this != WHITE;
+        return this != GREY;
     }
 }

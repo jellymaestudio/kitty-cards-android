@@ -8,14 +8,14 @@ public class CardTest {
 
     @Test
     public void constructorShouldSetColor() {
-        Card card = new Card(GameColor.RED, 3);
+        Card card = new Card(GameColor.PURPLE, 3);
 
-        assertEquals(GameColor.RED, card.getColor());
+        assertEquals(GameColor.PURPLE, card.getColor());
     }
 
     @Test
     public void constructorShouldSetValue() {
-        Card card = new Card(GameColor.BLUE, 5);
+        Card card = new Card(GameColor.CYAN, 5);
 
         assertEquals(5, card.getValue());
     }
@@ -27,17 +27,17 @@ public class CardTest {
 
     @Test
     public void constructorShouldThrowExceptionIfColorIsWhite() {
-        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.WHITE, 3));
+        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.GREY, 3));
     }
 
     @Test
     public void constructorShouldThrowExceptionIfValueIsLowerThanOne() {
-        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.RED, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.PURPLE, 0));
     }
 
     @Test
     public void constructorShouldThrowExceptionIfValueIsHigherThanSix() {
-        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.RED, 7));
+        assertThrows(IllegalArgumentException.class, () -> new Card(GameColor.PURPLE, 7));
     }
 
     @Test

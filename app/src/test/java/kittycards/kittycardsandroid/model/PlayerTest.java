@@ -67,7 +67,7 @@ public class PlayerTest {
     @Test
     public void addCardShouldAddCardToHandCards() {
         Player player = new Player(1, "Player One");
-        Card card = new Card(GameColor.RED, 3);
+        Card card = new Card(GameColor.PURPLE, 3);
 
         player.addCard(card);
 
@@ -85,7 +85,7 @@ public class PlayerTest {
     @Test
     public void removeCardShouldRemoveCardFromHandCards() {
         Player player = new Player(1, "Player One");
-        Card card = new Card(GameColor.BLUE, 4);
+        Card card = new Card(GameColor.CYAN, 4);
 
         player.addCard(card);
         player.removeCard(card);
@@ -136,7 +136,7 @@ public class PlayerTest {
     @Test
     public void selectCardShouldThrowExceptionIfPlayerDoesNotHaveCard() {
         Player player = new Player(1, "Player One");
-        Card card = new Card(GameColor.RED, 1);
+        Card card = new Card(GameColor.PURPLE, 1);
 
         assertThrows(IllegalArgumentException.class, () -> player.selectCard(card));
     }
@@ -144,7 +144,7 @@ public class PlayerTest {
     @Test
     public void unselectCardShouldClearSelectedCard() {
         Player player = new Player(1, "Player One");
-        Card card = new Card(GameColor.BLUE, 6);
+        Card card = new Card(GameColor.CYAN, 6);
 
         player.addCard(card);
         player.selectCard(card);
@@ -158,8 +158,8 @@ public class PlayerTest {
     public void clearHandCardsShouldRemoveAllCards() {
         Player player = new Player(1, "Player One");
 
-        player.addCard(new Card(GameColor.RED, 1));
-        player.addCard(new Card(GameColor.BLUE, 2));
+        player.addCard(new Card(GameColor.PURPLE, 1));
+        player.addCard(new Card(GameColor.CYAN, 2));
         player.clearHandCards();
 
         assertTrue(player.getHandCards().isEmpty());
@@ -214,7 +214,7 @@ public class PlayerTest {
     @Test
     public void resetShouldClearRoundSpecificData() {
         Player player = new Player(1, "Player One");
-        Card card = new Card(GameColor.RED, 4);
+        Card card = new Card(GameColor.PURPLE, 4);
 
         player.addCard(card);
         player.selectCard(card);

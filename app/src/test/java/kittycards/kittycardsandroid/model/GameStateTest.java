@@ -114,7 +114,7 @@ public class GameStateTest {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
                 if (!board.isCenterField(row, column)) {
-                    board.getField(row, column).placeCard(new Card(GameColor.RED, 1));
+                    board.getField(row, column).placeCard(new Card(GameColor.PURPLE, 1));
                 }
             }
         }

@@ -8,14 +8,14 @@ public class FieldTest {
 
     @Test
     public void constructorShouldSetColor() {
-        Field field = new Field(GameColor.RED, 0, 2);
+        Field field = new Field(GameColor.PURPLE, 0, 2);
 
-        assertEquals(GameColor.RED, field.getColor());
+        assertEquals(GameColor.PURPLE, field.getColor());
     }
 
     @Test
     public void constructorShouldSetRow() {
-        Field field = new Field(GameColor.BLUE, 2, 1);
+        Field field = new Field(GameColor.CYAN, 2, 1);
 
         assertEquals(2, field.getRow());
     }
@@ -42,28 +42,28 @@ public class FieldTest {
 
     @Test
     public void constructorShouldThrowExceptionIfRowIsNegative() {
-        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.RED, -1, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.PURPLE, -1, 0));
     }
 
     @Test
     public void constructorShouldThrowExceptionIfRowIsTooHigh() {
-        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.RED, 3, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.PURPLE, 3, 0));
     }
 
     @Test
     public void constructorShouldThrowExceptionIfColumnIsNegative() {
-        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.RED, 0, -1));
+        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.PURPLE, 0, -1));
     }
 
     @Test
     public void constructorShouldThrowExceptionIfColumnIsTooHigh() {
-        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.RED, 0, 3));
+        assertThrows(IllegalArgumentException.class, () -> new Field(GameColor.PURPLE, 0, 3));
     }
 
     @Test
     public void placeCardShouldPlaceCardOnEmptyField() {
-        Field field = new Field(GameColor.WHITE, 0, 0);
-        Card card = new Card(GameColor.RED, 4);
+        Field field = new Field(GameColor.GREY, 0, 0);
+        Card card = new Card(GameColor.PURPLE, 4);
 
         field.placeCard(card);
 
@@ -73,16 +73,16 @@ public class FieldTest {
 
     @Test
     public void placeCardShouldThrowExceptionIfCardIsNull() {
-        Field field = new Field(GameColor.WHITE, 0, 0);
+        Field field = new Field(GameColor.GREY, 0, 0);
 
         assertThrows(NullPointerException.class, () -> field.placeCard(null));
     }
 
     @Test
     public void placeCardShouldThrowExceptionIfFieldIsAlreadyOccupied() {
-        Field field = new Field(GameColor.WHITE, 0, 0);
-        Card firstCard = new Card(GameColor.RED, 2);
-        Card secondCard = new Card(GameColor.BLUE, 5);
+        Field field = new Field(GameColor.GREY, 0, 0);
+        Card firstCard = new Card(GameColor.PURPLE, 2);
+        Card secondCard = new Card(GameColor.CYAN, 5);
 
         field.placeCard(firstCard);
 
@@ -91,7 +91,7 @@ public class FieldTest {
 
     @Test
     public void clearFieldShouldRemovePlacedCard() {
-        Field field = new Field(GameColor.WHITE, 2, 2);
+        Field field = new Field(GameColor.GREY, 2, 2);
         Card card = new Card(GameColor.GREEN, 6);
 
         field.placeCard(card);
@@ -103,7 +103,7 @@ public class FieldTest {
 
     @Test
     public void clearFieldShouldKeepFieldEmptyIfAlreadyEmpty() {
-        Field field = new Field(GameColor.WHITE, 1, 1);
+        Field field = new Field(GameColor.GREY, 1, 1);
 
         field.clearField();
 
