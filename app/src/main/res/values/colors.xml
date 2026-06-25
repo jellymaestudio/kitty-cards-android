@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <resources>
+    <!-- Standard Colors -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -7,4 +9,18 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Our Colors -->
+    <color name="kc_background">#B8B0AE</color>
+    <color name="kc_dark_grey">#504E5B</color>
+    <color name="kc_light_grey">#6B627F</color>
+    <color name="kc_host">#FECEDE</color>
+    <color name="kc_guest">#CED2FF</color>
+
+    <!--
+    <color name="kc_yellow">#FFFCCF</color>
+    <color name="kc_green">#D6FFD0</color>
+    <color name="kc_cyan">#D0FFF7</color>
+    <color name="kc_purple">#F9DEFF</color>
+    -->
 </resources>

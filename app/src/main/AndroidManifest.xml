@@ -34,13 +34,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KittyCardsAndroid">
         <activity
-            android:name=".TestActivity"
+            android:name=".ui.LobbyActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ui.HostActivity" />
+        <activity android:name=".ui.JoinActivity" />
+        <activity android:name=".ui.GameActivity" />
     </application>
 
 </manifest>

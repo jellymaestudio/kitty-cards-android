@@ -22,7 +22,8 @@ import androidx.annotation.RequiresPermission;
 import java.util.ArrayList;
 
 /**
- * Acts as the BLE Peripheral/Server in the Bluetooth Low Energy communication, meaning it advertises itself as a host and accepts connections from guests.
+ * Acts as the BLE Peripheral/Server in the Bluetooth Low Energy communication, meaning it
+ * advertises itself as a host and accepts connections from guests.
  *
  * @author red_concrete
  */

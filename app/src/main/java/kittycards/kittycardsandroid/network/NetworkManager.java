@@ -22,6 +22,8 @@ import kittycards.kittycardsandroid.components.IProtocolEngine;
  */
 public class NetworkManager implements INetworkManager {
     //TODO: OutgoingQueue für sendGame, wenn mehrere gleichzeitig senden wollen.
+    //(Client Characteristic Configuration Descriptor) default in every BluetoothGattCharacteristic, used to enable notifications on the client side
+    static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     static final UUID KITTY_CARDS_SERVICE_UUID = UUID.fromString("0aac93ed-aff4-4ef0-85ef-019c11b3e434");//from: https://www.uuidgenerator.net/
     static final UUID KITTY_CARDS_CHARACTERISTIC_UUID = UUID.fromString("f4439cae-c811-418e-b314-c7258d85710c");//from: https://www.uuidgenerator.net/
     static final long SCAN_PERIOD = 10000;

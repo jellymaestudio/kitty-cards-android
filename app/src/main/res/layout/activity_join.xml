@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/joinMain"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/kc_background"
+    android:padding="24dp"
+    tools:context=".ui.JoinActivity">
+
+    <!-- Back Button -->
+    <TextView
+        android:id="@+id/backButton"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:textColor="@android:color/white"
+        android:text="←"
+        android:textSize="28sp"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Join Game Text -->
+    <TextView
+        android:id="@+id/joinTitleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Join Game"
+        android:textSize="28sp"
+        app:layout_constraintTop_toTopOf="@id/backButton"
+        app:layout_constraintBottom_toBottomOf="@id/backButton"
+        app:layout_constraintStart_toEndOf="@id/backButton"
+        android:layout_marginStart="24dp" />
+
+    <!-- Current Room Label -->
+    <TextView
+        android:id="@+id/currentRoomLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Current Room"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/backButton"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="48dp" />
+
+    <!-- Current Room Box -->
+    <LinearLayout
+        android:id="@+id/currentRoomBox"
+        android:layout_width="0dp"
+        android:layout_height="130dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        app:layout_constraintTop_toBottomOf="@id/currentRoomLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp">
+
+        <!-- statisch für den ersten Look -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Player#5432 (You)"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Denia#9876"
+                android:textSize="18sp" />
+        </LinearLayout>
+        <!-- -->
+    </LinearLayout>
+
+    <!-- Available Rooms Label -->
+    <TextView
+        android:id="@+id/availableRoomsLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Available Rooms"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/currentRoomBox"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="80dp" />
+
+    <!-- Available Rooms Box -->
+    <LinearLayout
+        android:id="@+id/availableRoomsBox"
+        android:layout_width="0dp"
+        android:layout_height="260dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        app:layout_constraintTop_toBottomOf="@id/availableRoomsLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp">
+
+        <!-- statisch für den ersten Look -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Player#1234"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="✓"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Player#1234"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="48dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="✓"
+                android:textSize="18sp" />
+        </LinearLayout>
+        <!-- -->
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
