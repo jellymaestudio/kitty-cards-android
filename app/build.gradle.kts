@@ -63,4 +63,9 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
 
     androidTestImplementation(libs.androidx.junit)
+
+    testImplementation(libs.robolectric)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.junit.jupiter)
+    testImplementation(libs.androidx.core)
 }
