@@ -31,14 +31,14 @@ public class NetworkManager implements INetworkManager {
     static final long SCAN_PERIOD = 10000;
 
     private static volatile NetworkManager instance;
-    final IProtocolEngine protocolEngine;
 
-    private final BleHost bleHost;
-    private final BleGuest bleGuest;
+    final BleHost bleHost;
+    final BleGuest bleGuest;
+    final IProtocolEngine protocolEngine;
+    final Handler handler = new Handler(Looper.getMainLooper());
 
     private volatile Role role = Role.NOT_CONNECTED;
 
-    final Handler handler = new Handler(Looper.getMainLooper());
     private final BluetoothAdapter bluetoothAdapter;
     private final BluetoothManager bluetoothManager;
     private final Context context;
@@ -51,14 +51,35 @@ public class NetworkManager implements INetworkManager {
     // -------------------------------------------------------------------------
     // Singleton
     // -------------------------------------------------------------------------
-    private NetworkManager(Context context) {
+
+    private NetworkManager(Context context, BleHost bleHost, BleGuest bleGuest, boolean isTestInstance) {
         this.context = context.getApplicationContext();
         this.protocolEngine = new ProtocolEngine();
         this.bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.bluetoothAdapter = bluetoothManager.getAdapter();
+        this.bleGuest = bleGuest != null ? bleGuest : new BleGuest(this, this.context, this.bluetoothManager);
+        this.bleHost = bleHost != null ? bleHost : new BleHost(this, this.context, this.bluetoothManager);
+    }
 
+    private NetworkManager(Context context) {
+        this(context, null, null, false);
+    }
+
+    // For testing purposes only
+    NetworkManager(Context context, BleHost bleHost, BleGuest bleGuest) {
+        this(context, bleHost, bleGuest, true);
+        instance = this;
+    }
+
+    // For testing purposes only
+    NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine) {
+        this.context = context.getApplicationContext();
+        this.protocolEngine = protocolEngine;
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager.getAdapter();
         this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
         this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
+        instance = this;
     }
 
     /**
@@ -188,8 +209,8 @@ public class NetworkManager implements INetworkManager {
      * Emits a network event to the registered listener on the main thread.
      * Used by BLE components to forward status, warnings and errors to UI layer.
      *
-     * @param type event severity/type
-     * @param source origin of the event (e.g. BleHost, BleGuest)
+     * @param type    event severity/type
+     * @param source  origin of the event (e.g. BleHost, BleGuest)
      * @param message human-readable message
      */
     protected void emitEvent(NetworkEvent.NetworkMessageType type, String source, String message) {
@@ -205,6 +226,7 @@ public class NetworkManager implements INetworkManager {
 
     /**
      * Returns the player's current role (HOST, GUEST, NOT_CONNECTED)
+     *
      * @return the role
      */
     public Role getRole() {
