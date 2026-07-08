@@ -1,122 +1,241 @@
 package kittycards.kittycardsandroid.ui
 
+import android.Manifest
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
-import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import kittycards.kittycardsandroid.R
-import kittycards.kittycardsandroid.model.GameColor
+import kittycards.kittycardsandroid.network.NetworkDevice
+import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 
-/**
- * @author JellyMae
- */
 class JoinActivity : AppCompatActivity() {
 
-    /*private val playerRowColors = listOf(
-        GameColor.YELLOW,
-        GameColor.GREEN,
-        GameColor.CYAN,
-        GameColor.PURPLE
-    )
+    private lateinit var networkManager: NetworkManager
 
-    fun playerListColor(index: Int): GameColor {
-        val colors = listOf(
-            GameColor.YELLOW,
-            GameColor.GREEN,
-            GameColor.CYAN,
-            GameColor.PURPLE
-        )
+    private val availableRooms = mutableListOf<NetworkDevice>()
+    private var selectedRoom: NetworkDevice? = null
 
-        return colors[index % colors.size]
-    }*/
+    private lateinit var roomPlayersContainer: LinearLayout
+    private lateinit var availableRoomsContainer: LinearLayout
 
-
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         supportActionBar?.hide()
         setContentView(R.layout.activity_join)
 
-        val backButton = findViewById<TextView>(R.id.backButton)
+        networkManager = NetworkManager.getInstance(this)
 
-        backButton.setOnClickListener {
-            finish()
-        }
+        bindViews()
+        applyWindowInsets()
+        setupClickListeners()
+        setupBackNavigation()
 
+        // startScanning()
 
-        /*addAvailableRooms("Player#1234", 0)
-        addAvailableRooms("Luuk#5678", 1)
-        addAvailableRooms("Denia#9876", 2)
-        addAvailableRooms("Pixel 8", 3)
-
-        addPlayerToRoom("Jil's Phone (You)")
-        addPlayerToRoom("Pixel 8")*/
+        renderRoom()
+        renderAvailableRooms()
     }
 
+    private fun bindViews() {
+        roomPlayersContainer = findViewById(R.id.roomPlayersContainer)
+        availableRoomsContainer = findViewById(R.id.availableRoomsContainer)
+    }
 
-    /*private fun addAvailableRooms(name: String, index: Int) {
-        val box = findViewById<LinearLayout>(R.id.availablePlayersBox)
-        val gameColor = playerRowColors[index % playerRowColors.size]
+    private fun applyWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.joinRoot)) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
 
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(GameColorMapper.toAndroidColor(gameColor))
+            view.setPadding(
+                systemBars.left + 24,
+                systemBars.top + 24,
+                systemBars.right + 24,
+                systemBars.bottom + 24
+            )
+
+            insets
+        }
+    }
+
+    private fun setupClickListeners() {
+        findViewById<TextView>(R.id.backButton).setOnClickListener {
+            leaveRoomAndReturn()
+        }
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    leaveRoomAndReturn()
+                }
+            }
+        )
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    private fun startScanning() {
+        networkManager.joinMatch { updatedRooms ->
+            runOnUiThread {
+                availableRooms.clear()
+                availableRooms.addAll(updatedRooms)
+
+                renderAvailableRooms()
+            }
+        }
+    }
+
+    private fun renderRoom() {
+        roomPlayersContainer.removeAllViews()
+
+        roomPlayersContainer.addView(
+            createRoomPlayerRow(
+                text = "${getDeviceName()} (You)",
+                backgroundColor = getColor(R.color.kc_guest)
+            )
+        )
+
+        selectedRoom?.let { room ->
+            roomPlayersContainer.addView(
+                createRoomPlayerRow(
+                    text = room.deviceName() ?: "Unknown Host",
+                    backgroundColor = getColor(R.color.kc_host)
+                )
+            )
+        }
+    }
+
+    private fun renderAvailableRooms() {
+        availableRoomsContainer.removeAllViews()
+
+        availableRooms
+            .filter { it != selectedRoom }
+            .forEachIndexed { index, room ->
+                availableRoomsContainer.addView(
+                    createAvailableRoomRow(
+                        room = room,
+                        index = index
+                    )
+                )
+            }
+    }
+
+    private fun createRoomPlayerRow(text: String, backgroundColor: Int): View {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 18f
+            setTextColor(getColor(android.R.color.black))
+            setBackgroundColor(backgroundColor)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(16.dp(), 0, 16.dp(), 0)
 
             layoutParams = LinearLayout.LayoutParams(
                 MATCH_PARENT,
-                WRAP_CONTENT
+                52.dp()
             ).apply {
-                topMargin = 6
+                bottomMargin = 10.dp()
+            }
+        }
+    }
+
+    private fun createAvailableRoomRow(room: NetworkDevice, index: Int): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(GameColorMapper.playerListColor(index))
+
+            layoutParams = LinearLayout.LayoutParams(
+                MATCH_PARENT,
+                56.dp()
+            ).apply {
+                bottomMargin = 8.dp()
             }
         }
 
         val nameText = TextView(this).apply {
-            text = name
+            text = room.deviceName() ?: "Unknown Room"
             textSize = 18f
+            setTextColor(getColor(android.R.color.black))
+            setSingleLine(true)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(16.dp(), 0, 12.dp(), 0)
+            gravity = Gravity.CENTER_VERTICAL
+
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                MATCH_PARENT,
                 1f
             )
         }
 
-        val acceptText = TextView(this).apply {
-            text = "✓"
-            textSize = 18f
-            gravity = Gravity.CENTER
+        val joinButton = Button(this).apply {
+            text = if (selectedRoom == room) "..." else "✓"
+            textSize = 22f
+            setTextColor(getColor(android.R.color.white))
+            setBackgroundColor(getColor(R.color.kc_dark_grey))
+
             layoutParams = LinearLayout.LayoutParams(
-                48,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                56.dp(),
+                MATCH_PARENT
             )
+
+            setOnClickListener {
+                requestRoomJoin(room)
+            }
         }
 
         row.addView(nameText)
-        row.addView(acceptText)
+        row.addView(joinButton)
 
-        box.addView(row)
+        return row
     }
 
-
-    private fun addPlayerToRoom(name: String) {
-        val box = findViewById<LinearLayout>(R.id.currentRoomBox)
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            background = getDrawable(android.R.drawable.editbox_background)
+    private fun requestRoomJoin(room: NetworkDevice) {
+        if (selectedRoom != null) {
+            return
         }
 
-        val nameText = TextView(this).apply {
-            text = name
-            textSize = 18f
+        selectedRoom = room
+
+        try {
+            networkManager.confirmRoom(room)
+        } catch (_: SecurityException) {
+            // Bluetooth permission was denied or revoked.
         }
 
-        row.addView(nameText)
+        renderRoom()
+        renderAvailableRooms()
+    }
 
-        box.addView(row)
-    }*/
+    private fun leaveRoomAndReturn() {
+        try {
+            networkManager.disconnect()
+        } catch (_: SecurityException) {
+            // Bluetooth permission was denied or revoked.
+        }
+
+        finish()
+    }
+
+    private fun getDeviceName(): String {
+        return Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
+            ?: "Guest Device"
+    }
+
+    private fun Int.dp(): Int {
+        return (this * resources.displayMetrics.density).toInt()
+    }
 }

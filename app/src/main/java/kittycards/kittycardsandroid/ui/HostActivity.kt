@@ -1,137 +1,264 @@
 package kittycards.kittycardsandroid.ui
 
-import android.os.Bundle
-import android.view.Gravity
-import android.widget.LinearLayout
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
-import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import kittycards.kittycardsandroid.R
-import kittycards.kittycardsandroid.model.GameColor
-import kittycards.kittycardsandroid.ui.util.GameColorMapper
+import android.Manifest
 import android.content.Intent
+import android.os.Bundle
+import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.annotation.RequiresPermission
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.network.NetworkDevice
+import kittycards.kittycardsandroid.network.NetworkManager
+import kittycards.kittycardsandroid.ui.util.GameColorMapper
 
-/**
- * @author JellyMae
- */
 class HostActivity : AppCompatActivity() {
 
-    private val playerRowColors = listOf(
-        GameColor.YELLOW,
-        GameColor.GREEN,
-        GameColor.CYAN,
-        GameColor.PURPLE
-    )
+    private lateinit var networkManager: NetworkManager
 
-    fun playerListColor(index: Int): GameColor {
-        val colors = listOf(
-            GameColor.YELLOW,
-            GameColor.GREEN,
-            GameColor.CYAN,
-            GameColor.PURPLE
-        )
+    private val availableGuests = mutableListOf<NetworkDevice>()
+    private var selectedGuest: NetworkDevice? = null
 
-        return colors[index % colors.size]
-    }
+    private lateinit var roomPlayersContainer: LinearLayout
+    private lateinit var availablePlayersContainer: LinearLayout
+    private lateinit var startMatchButton: Button
 
-
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         supportActionBar?.hide()
         setContentView(R.layout.activity_host)
 
-        val backButton = findViewById<TextView>(R.id.backButton)
+        networkManager = NetworkManager.getInstance(this)
 
-        backButton.setOnClickListener {
-            finish()
-        }
-
-        val startMatchButton = findViewById<Button>(R.id.startMatchButton)
-
-        startMatchButton.setOnClickListener {
-            startActivity(Intent(this, GameActivity::class.java))
-        }
-
-        /*
-        val availablePlayers = networkManager.getAvailablePlayers()
-
-        availablePlayers.forEachIndexed { index, player ->
-            addAvailablePlayer(player.name, index)
-        }
-         */
-
-        addAvailablePlayer("Player#1234", 0)
-        addAvailablePlayer("Luuk#5678", 1)
-        addAvailablePlayer("Denia#9876", 2)
-        addAvailablePlayer("Pixel 8", 3)
-
-        addPlayerToRoom("Jil's Phone (You)")
-        addPlayerToRoom("Pixel 8")
+        bindViews()
+        applyWindowInsets()
+        setupClickListeners()
+        setupBackNavigation()
+        //startHosting()
+        renderRoom()
+        renderAvailablePlayers()
     }
 
+    private fun bindViews() {
+        roomPlayersContainer = findViewById(R.id.roomPlayersContainer)
+        availablePlayersContainer = findViewById(R.id.availablePlayersContainer)
+        startMatchButton = findViewById(R.id.startMatchButton)
+    }
 
-    private fun addAvailablePlayer(name: String, index: Int) {
-        val box = findViewById<LinearLayout>(R.id.availablePlayersBox)
-        val gameColor = playerRowColors[index % playerRowColors.size]
+    private fun applyWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.hostRoot)) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
 
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(GameColorMapper.toAndroidColor(gameColor))
+            view.setPadding(
+                systemBars.left + 24,
+                systemBars.top + 24,
+                systemBars.right + 24,
+                systemBars.bottom + 24
+            )
+
+            insets
+        }
+    }
+
+    private fun setupClickListeners() {
+        findViewById<TextView>(R.id.backButton).setOnClickListener {
+            closeRoomAndReturn()
+        }
+
+        startMatchButton.setOnClickListener {
+            startMatch()
+        }
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    closeRoomAndReturn()
+                }
+            }
+        )
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    private fun startHosting() {
+        networkManager.hostMatch { connectedGuests ->
+            runOnUiThread {
+                availableGuests.clear()
+                availableGuests.addAll(connectedGuests)
+
+                selectedGuest?.let { guest ->
+                    if (!availableGuests.contains(guest)) {
+                        selectedGuest = null
+                    }
+                }
+
+                renderRoom()
+                renderAvailablePlayers()
+            }
+        }
+    }
+
+    private fun renderRoom() {
+        roomPlayersContainer.removeAllViews()
+
+        val hostName = getDeviceName()
+        roomPlayersContainer.addView(
+            createRoomPlayerRow(
+                text = "$hostName (You)",
+                backgroundColor = getColor(R.color.kc_host)
+            )
+        )
+
+        selectedGuest?.let { guest ->
+            roomPlayersContainer.addView(
+                createRoomPlayerRow(
+                    text = guest.deviceName() ?: "Unknown Guest",
+                    backgroundColor = getColor(R.color.kc_guest)
+                )
+            )
+        }
+
+        //(vorerst auskommentiert zum Testen) startMatchButton.isEnabled = selectedGuest != null
+        startMatchButton.isEnabled = true
+    }
+
+    private fun renderAvailablePlayers() {
+        availablePlayersContainer.removeAllViews()
+
+        availableGuests.forEachIndexed { index, guest ->
+            availablePlayersContainer.addView(
+                createAvailablePlayerRow(
+                    guest = guest,
+                    index = index
+                )
+            )
+        }
+    }
+
+    private fun createRoomPlayerRow(text: String, backgroundColor: Int): View {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 18f
+            setTextColor(getColor(android.R.color.black))
+            setBackgroundColor(backgroundColor)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(16, 0, 16, 0)
 
             layoutParams = LinearLayout.LayoutParams(
                 MATCH_PARENT,
-                WRAP_CONTENT
+                52.dp()
             ).apply {
-                topMargin = 6
+                bottomMargin = 10.dp()
+            }
+        }
+    }
+
+    private fun createAvailablePlayerRow(guest: NetworkDevice, index: Int): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(GameColorMapper.playerListColor(index))
+
+            layoutParams = LinearLayout.LayoutParams(
+                MATCH_PARENT,
+                56.dp()
+            ).apply {
+                bottomMargin = 8
             }
         }
 
         val nameText = TextView(this).apply {
-            text = name
+            text = guest.deviceName() ?: "Unknown Device"
             textSize = 18f
+            setTextColor(getColor(android.R.color.black))
+            setSingleLine(true)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(16, 0, 12, 0)
+            gravity = Gravity.CENTER_VERTICAL
+
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                MATCH_PARENT,
                 1f
             )
         }
 
-        val acceptText = TextView(this).apply {
+        val acceptButton = Button(this).apply {
             text = "✓"
-            textSize = 18f
-            gravity = Gravity.CENTER
+            textSize = 22f
+            setTextColor(getColor(android.R.color.white))
+            setBackgroundColor(getColor(R.color.kc_dark_grey))
+
             layoutParams = LinearLayout.LayoutParams(
-                48,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                56.dp(),
+                MATCH_PARENT
             )
+
+            isEnabled = selectedGuest == null || selectedGuest == guest
+
+            setOnClickListener {
+                acceptGuest(guest)
+            }
         }
 
         row.addView(nameText)
-        row.addView(acceptText)
+        row.addView(acceptButton)
 
-        box.addView(row)
+        return row
     }
 
-
-    private fun addPlayerToRoom(name: String) {
-        val box = findViewById<LinearLayout>(R.id.currentRoomBox)
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            background = getDrawable(android.R.drawable.editbox_background)
+    private fun acceptGuest(guest: NetworkDevice) {
+        if (selectedGuest != null) {
+            return
         }
 
-        val nameText = TextView(this).apply {
-            text = name
-            textSize = 18f
+        selectedGuest = guest
+        networkManager.selectGuest(guest)
+
+        renderRoom()
+        renderAvailablePlayers()
+    }
+
+    private fun startMatch() {
+        // Temporary for emulator/UI testing.
+        // Real match start will be added later.
+        openGameScreen()
+    }
+
+    private fun openGameScreen() {
+        startActivity(
+            Intent(this, GameActivity::class.java)
+        )
+    }
+
+    private fun closeRoomAndReturn() {
+        try {
+            networkManager.disconnect()
+        } catch (_: SecurityException) {
+            // Bluetooth permission was denied or revoked.
         }
 
-        row.addView(nameText)
+        finish()
+    }
 
-        box.addView(row)
+    private fun getDeviceName(): String {
+        return Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
+            ?: "Host Device"
+    }
+
+    private fun Int.dp(): Int {
+        return (this * resources.displayMetrics.density).toInt()
     }
 }
