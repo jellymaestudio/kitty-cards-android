@@ -4,63 +4,63 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
+    android:id="@+id/lobbyRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/kc_background"
-    android:padding="24dp"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
     tools:context=".ui.LobbyActivity">
 
-    <!-- Title -->
     <TextView
-        android:id="@+id/titleText1"
+        android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@android:color/black"
         android:text="Kitty Cards"
-        android:textSize="28sp"
+        android:textColor="@android:color/black"
+        android:textSize="36sp"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/subtitleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="80dp"/>
+        android:layout_marginTop="72dp" />
 
     <TextView
-        android:id="@+id/lobbyText"
+        android:id="@+id/subtitleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@android:color/black"
         android:text="Lobby"
-        android:textSize="22sp"
-        app:layout_constraintTop_toBottomOf="@id/titleText1"
+        android:textColor="@android:color/black"
+        android:textSize="24sp"
+        app:layout_constraintTop_toBottomOf="@id/titleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="4dp" />
 
-
-    <!-- Host Button -->
     <Button
-        android:id="@+id/hostButton"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:backgroundTint="@color/kc_host"
-        android:textColor="@android:color/black"
+        android:id="@+id/hostGameButton"
+        android:layout_width="240dp"
+        android:layout_height="64dp"
         android:text="Host Game"
-        app:layout_constraintTop_toBottomOf="@id/lobbyText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="120dp"/>
-
-    <!-- Join Button -->
-    <Button
-        android:id="@+id/joinButton"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:backgroundTint="@color/kc_guest"
         android:textColor="@android:color/black"
-        android:text="Join Game"
-        app:layout_constraintTop_toBottomOf="@id/hostButton"
+        android:textSize="24sp"
+        android:backgroundTint="@color/kc_host"
+        app:layout_constraintTop_toBottomOf="@id/subtitleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="60dp"/>
+        android:layout_marginTop="120dp" />
+
+    <Button
+        android:id="@+id/joinGameButton"
+        android:layout_width="240dp"
+        android:layout_height="64dp"
+        android:text="Join Game"
+        android:textColor="@android:color/black"
+        android:textSize="24sp"
+        android:backgroundTint="@color/kc_guest"
+        app:layout_constraintTop_toBottomOf="@id/hostGameButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="64dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
