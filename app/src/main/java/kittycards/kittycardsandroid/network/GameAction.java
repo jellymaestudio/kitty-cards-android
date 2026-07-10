@@ -86,6 +86,17 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
     }
 
     /**
+     * Creates an action for dealing a card to one of the match players.
+     *
+     * @param type        must be {@link ActionType#DEAL_CARD}
+     * @param card        the dealt card
+     * @param playerIndex target player index: 0 for player one, 1 for player two
+     */
+    public GameAction(ActionType type, Card card, int playerIndex) {
+        this(type, card, null, -1, -1, playerIndex);
+    }
+
+    /**
      * Creates a GameAction with all parameters explicitly set.
      *
      * @param type                the type of action; must not be {@code null}
@@ -112,14 +123,22 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
         if (type == null)
             throw new NullPointerException("ActionType must not be null");
 
-        if ((type == ActionType.DRAW_CARD || type == ActionType.SELECT_CARD || type == ActionType.PLAY_CARD) && card == null)
+        if ((type == ActionType.DRAW_CARD || type == ActionType.SELECT_CARD || type == ActionType.PLAY_CARD || type == ActionType.DEAL_CARD) && card == null)
             throw new IllegalArgumentException(type + " requires a card");
 
         if ((type == ActionType.PLAY_CARD || type == ActionType.SET_BOARD_COLOR) && (boardPositionColumn < 0 || boardPositionColumn > 2 || boardPositionRow < 0 || boardPositionRow > 2))
             throw new IllegalArgumentException(type.name() + " requires a valid board position");
 
+        if (type == ActionType.DEAL_CARD && contextSensitiveInt != 0 && contextSensitiveInt != 1) {
+            throw new IllegalArgumentException("DEAL_CARD requires player index 0 or 1");
+        }
+
         if (type == ActionType.SET_BOARD_COLOR && boardColor == null)
             throw new IllegalArgumentException("SET_BOARD_COLOR requires a color");
+
+        if (type == ActionType.SET_STARTING_PLAYER && contextSensitiveInt != 0 && contextSensitiveInt != 1) {
+            throw new IllegalArgumentException("SET_STARTING_PLAYER requires player index 0 or 1");
+        }
     }
 
     public enum ActionType {
@@ -128,7 +147,9 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
         SELECT_CARD, //must be sent together with the selected card
         UNSELECT_CARD,
         PLAY_CARD, //must be specified together with the card being played and the board position
+        DEAL_CARD,
         SET_BOARD_COLOR, //must be specified together with the color being set and the board position
-        SET_STARTING_PLAYER //must be specified together with the contextSensitiveInt, which is the player index of the starting player (Host: 0 or Guest: 1)
+        SET_STARTING_PLAYER, //must be specified together with the contextSensitiveInt, which is the player index of the starting player (Host: 0 or Guest: 1)
+        MATCH_FINISHED
     }
 }

@@ -42,6 +42,9 @@ public class GameController implements IGameController {
     private MoveValidator moveValidator;
     private INetworkManager networkManager;
     private Runnable onStateChangedListener;
+    private static final int STARTING_PLAYER_INITIAL_CARDS = 2;
+    private static final int SECOND_PLAYER_INITIAL_CARDS = 3;
+    private boolean initialRoundSetupReceived;
 
 
     // --- Constructor ---
@@ -129,7 +132,9 @@ public class GameController implements IGameController {
         applyStartMatch(playerOne, playerTwo);
 
         if (role == Role.HOST) {
+            sendStartingPlayer();
             sendBoardSetup();
+            dealInitialCards();
         }
 
         notifyStateChanged();
@@ -253,6 +258,19 @@ public class GameController implements IGameController {
                     receivedStartingPlayer = match.getPlayerTwo();
                 }
                 break;
+
+            case DEAL_CARD:
+                Player targetPlayer =
+                        action.contextSensitiveInt() == 0
+                                ? match.getPlayerOne()
+                                : match.getPlayerTwo();
+
+                targetPlayer.addCard(action.card());
+                break;
+
+            case MATCH_FINISHED:
+                match.finishMatch();
+                break;
         }
 
         notifyStateChanged();
@@ -265,6 +283,10 @@ public class GameController implements IGameController {
         this.match = new Match(playerOne, playerTwo);
         this.moveValidator = new MoveValidator(getMatch());
         this.match.setMatchStatus(MatchStatus.RUNNING);
+
+        receivedBoardColors.clear();
+        receivedStartingPlayer = null;
+        initialRoundSetupReceived = role == Role.HOST;
     }
 
 
@@ -281,16 +303,25 @@ public class GameController implements IGameController {
         GameState gameState = match.getGameState();
         Field chosenField = gameState.getBoard().getField(row, column);
 
-        chosenField.placeCard(card);
-        player.addScore(calculateScore(card, chosenField));
+        int score = calculateScore(card, chosenField);
+
+        chosenField.placeCard(card, player, score);
+        player.addScore(score);
         player.unselectCard();
         player.removeCard(card);
 
         if (gameState.isGameOver()) {
             if (role == Role.HOST) {
                 match.startNextRound();
-                sendStartingPlayer();
-                sendBoardSetup();
+
+                if (match.getMatchStatus() == MatchStatus.FINISHED) {
+                    sendGameAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
+                }
+                else {
+                    sendStartingPlayer();
+                    sendBoardSetup();
+                    dealInitialCards();
+                }
             }
             return;
         }
@@ -308,11 +339,26 @@ public class GameController implements IGameController {
     private void applyBoardColor(GameColor color) {
         receivedBoardColors.add(color);
 
-        if (receivedBoardColors.size() == 8 && receivedStartingPlayer != null) {
-            match.startNextRound(receivedBoardColors, receivedStartingPlayer);
-            receivedBoardColors.clear();
-            receivedStartingPlayer = null;
+        if (receivedBoardColors.size() != 8 || receivedStartingPlayer == null) {
+            return;
         }
+
+        if (!initialRoundSetupReceived) {
+            match.initializeCurrentRound(
+                    receivedBoardColors,
+                    receivedStartingPlayer
+            );
+
+            initialRoundSetupReceived = true;
+        } else {
+            match.startNextRound(
+                    receivedBoardColors,
+                    receivedStartingPlayer
+            );
+        }
+
+        receivedBoardColors.clear();
+        receivedStartingPlayer = null;
     }
 
 
@@ -326,17 +372,53 @@ public class GameController implements IGameController {
         return new Card(color, value);
     }
 
+    private void dealInitialCards() {
+        GameState gameState = match.getGameState();
+
+        dealCards(
+                gameState.getStartingPlayer(),
+                STARTING_PLAYER_INITIAL_CARDS
+        );
+
+        dealCards(
+                gameState.getSecondPlayer(),
+                SECOND_PLAYER_INITIAL_CARDS
+        );
+    }
+
+    private void dealCards(Player player, int amount) {
+        int playerIndex = player == match.getPlayerOne() ? 0 : 1;
+
+        for (int i = 0; i < amount; i++) {
+            Card card = generateCard();
+
+            player.addCard(card);
+
+            sendGameAction(new GameAction(
+                    GameAction.ActionType.DEAL_CARD,
+                    card,
+                    playerIndex
+            ));
+        }
+    }
+
     private int calculateScore(Card card, Field field) {
+        if (card == null || field == null) {
+            throw new NullPointerException("card and field cannot be null");
+        }
+
         GameColor cardColor = card.getColor();
         GameColor fieldColor = field.getColor();
 
         if (fieldColor == GameColor.GREY) {
             return card.getValue();
-        } else if (cardColor == fieldColor) {
-            return card.getValue() * 2;
-        } else {
-            return 0;
         }
+
+        if (cardColor == fieldColor) {
+            return card.getValue() * 2;
+        }
+
+        return 0;
     }
 
     private void switchTurn() {
