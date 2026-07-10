@@ -5,6 +5,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -176,13 +177,11 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun createVisibleCardView(card: Card): View {
-        return TextView(this).apply {
-            text = card.value.toString()
-            textSize = 22f
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            setTextColor(getColor(android.R.color.black))
+        val cardView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(GameColorMapper.toAndroidColor(card.color))
-            setPadding(0, 8.dp(), 0, 0)
+            setPadding(4.dp(), 6.dp(), 4.dp(), 4.dp())
 
             layoutParams = LinearLayout.LayoutParams(
                 56.dp(),
@@ -191,12 +190,41 @@ class GameActivity : AppCompatActivity() {
                 marginEnd = 8.dp()
             }
         }
+
+        val valueText = TextView(this).apply {
+            text = card.value.toString()
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(getColor(android.R.color.black))
+
+            layoutParams = LinearLayout.LayoutParams(
+                MATCH_PARENT,
+                28.dp()
+            )
+        }
+
+        val kittyImage = ImageView(this).apply {
+            setImageResource(R.drawable.kitty_card)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = null
+
+            layoutParams = LinearLayout.LayoutParams(
+                MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+
+        cardView.addView(valueText)
+        cardView.addView(kittyImage)
+
+        return cardView
     }
 
     private fun createBoardFieldView(fieldColor: GameColor, placedCard: Card?): View {
         val outer = LinearLayout(this).apply {
             setBackgroundColor(GameColorMapper.toAndroidColor(fieldColor))
-            setPadding(6.dp(), 6.dp(), 6.dp(), 6.dp())
+            setPadding(8.dp(), 8.dp(), 8.dp(), 8.dp())
 
             layoutParams = GridLayout.LayoutParams().apply {
                 width = 100.dp()
