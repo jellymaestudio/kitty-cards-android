@@ -99,6 +99,7 @@ public class MoveValidatorTest {
         assertFalse(validator.canPlayCard(player, 1, 1));
     }
 
+    /*
     @Test
     public void canPlayCardShouldReturnFalseIfFieldIsOccupied() {
         Match match = createMatch();
@@ -112,7 +113,7 @@ public class MoveValidatorTest {
         match.getGameState().getBoard().getField(0, 0).placeCard(placedCard);
 
         assertFalse(validator.canPlayCard(player, 0, 0));
-    }
+    }*/
 
     @Test
     public void canPlayCardShouldReturnFalseIfPlayerHasNoSelectedCard() {

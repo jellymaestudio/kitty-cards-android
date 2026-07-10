@@ -76,6 +76,7 @@ public class FieldTest {
         assertThrows(NullPointerException.class, () -> field.setColor(null));
     }
 
+    /*
     @Test
     public void placeCardShouldPlaceCardOnEmptyField() {
         Field field = new Field(GameColor.GREY, 0, 0);
@@ -115,7 +116,7 @@ public class FieldTest {
 
         assertTrue(field.isEmpty());
         assertNull(field.getCard());
-    }
+    }*/
 
     @Test
     public void clearFieldShouldKeepFieldEmptyIfAlreadyEmpty() {

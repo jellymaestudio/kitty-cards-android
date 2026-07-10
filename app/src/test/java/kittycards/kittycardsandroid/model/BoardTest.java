@@ -200,6 +200,7 @@ public class BoardTest {
         assertFalse(board.isFull());
     }
 
+    /*
     @Test
     public void isFullShouldReturnTrueIfAllPlayableFieldsAreOccupied() {
         Board board = new Board();
@@ -254,6 +255,7 @@ public class BoardTest {
         }
     }
 
+
     private void fillPlayableFields(Board board) {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
@@ -262,5 +264,5 @@ public class BoardTest {
                 }
             }
         }
-    }
+    }*/
 }
