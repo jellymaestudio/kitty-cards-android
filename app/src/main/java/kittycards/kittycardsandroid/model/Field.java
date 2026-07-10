@@ -15,6 +15,8 @@ public class Field {
     private final int row;
     private final int column;
     private Card card;
+    private int cardOwnerId;
+    private int displayedScore;
 
 
     // --- Constructor ---
@@ -40,6 +42,8 @@ public class Field {
         this.row = row;
         this.column = column;
         this.card = null;
+        this.cardOwnerId = -1;
+        this.displayedScore = 0;
     }
 
 
@@ -96,6 +100,24 @@ public class Field {
     }
 
     /**
+     * Returns the id of the player who placed the card on this field.
+     *
+     * @return the owner's player id, or {@code -1} if the field is empty
+     */
+    public int getCardOwnerId() {
+        return cardOwnerId;
+    }
+
+    /**
+     * Returns the score displayed on the placed card.
+     *
+     * @return the displayed score, or {@code 0} if the field is empty
+     */
+    public int getDisplayedScore() {
+        return displayedScore;
+    }
+
+    /**
      * Checks whether this field is empty.
      *
      * @return {@code true} if no card is placed on this field, otherwise {@code false}
@@ -108,21 +130,31 @@ public class Field {
     // --- Field Management ---
 
     /**
-     * Places a card on this field.
+     * Places a card on this field and stores its owner and resulting score.
      *
-     * @param card the card to place on this field
-     * @throws NullPointerException     if {@code card} is {@code null}
-     * @throws IllegalArgumentException if this field is already occupied
+     * @param card           the card to place
+     * @param player         the player placing the card
+     * @param displayedScore the score achieved by placing the card
+     * @throws NullPointerException     if {@code card} or {@code player} is {@code null}
+     * @throws IllegalArgumentException if the field is occupied or the score is negative
      */
-    public void placeCard(Card card) {
+    public void placeCard(Card card, Player player, int displayedScore) {
         if (card == null) {
-            throw new NullPointerException("card can not be null");
+            throw new NullPointerException("card cannot be null");
+        }
+        if (player == null) {
+            throw new NullPointerException("player cannot be null");
         }
         if (!isEmpty()) {
             throw new IllegalArgumentException("field is already occupied");
         }
+        if (displayedScore < 0) {
+            throw new IllegalArgumentException("displayed score cannot be negative");
+        }
 
         this.card = card;
+        this.cardOwnerId = player.getId();
+        this.displayedScore = displayedScore;
     }
 
     /**
@@ -133,5 +165,7 @@ public class Field {
      */
     public void clearField() {
         this.card = null;
+        this.cardOwnerId = -1;
+        this.displayedScore = 0;
     }
 }

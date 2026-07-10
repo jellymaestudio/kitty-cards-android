@@ -158,11 +158,6 @@ public class Match {
      */
     private void prepareNewRound() {
         Player startingPlayer = getNextStartingPlayer();
-
-        if (matchState.getCurrentRound() > 1) {
-            addWinToRoundWinner();
-        }
-
         Player secondPlayer = getOtherPlayer(startingPlayer);
 
         playerOne.reset();
@@ -183,16 +178,25 @@ public class Match {
      * @param startingPlayer the player that starts the next round
      */
     private void prepareNewRound(List<GameColor> fieldColors, Player startingPlayer) {
-        if (matchState.getCurrentRound() > 1) {
-            addWinToRoundWinner();
-        }
-
         Player secondPlayer = getOtherPlayer(startingPlayer);
 
         playerOne.reset();
         playerTwo.reset();
 
         gameState = new GameState(startingPlayer, secondPlayer, fieldColors);
+    }
+
+    /**
+     * Finishes the current round and the match.
+     */
+    public void finishMatch() {
+        if (matchStatus == MatchStatus.FINISHED) {
+            return;
+        }
+
+        finishCurrentRound();
+        matchState.isMatchFinished(playerOne, playerTwo);
+        matchStatus = MatchStatus.FINISHED;
     }
 
     /**
@@ -206,18 +210,22 @@ public class Match {
                 : playerTwo;
     }
 
-    /**
-     * Adds one win to the winner of the previous round.
-     * <p>
-     * If the round ends in a draw, no win is awarded.
-     * </p>
-     */
-    private void addWinToRoundWinner() {
+    private void finishCurrentRound() {
+        RoundResult result;
+
         if (playerOne.getScore() > playerTwo.getScore()) {
             playerOne.addWin();
-        } else if (playerTwo.getScore() > playerOne.getScore()) {
-            playerTwo.addWin();
+            result = RoundResult.PLAYER_ONE_WIN;
         }
+        else if (playerTwo.getScore() > playerOne.getScore()) {
+            playerTwo.addWin();
+            result = RoundResult.PLAYER_TWO_WIN;
+        }
+        else {
+            result = RoundResult.DRAW;
+        }
+
+        matchState.addRoundResult(result);
     }
 
     /**
@@ -228,6 +236,8 @@ public class Match {
      * </p>
      */
     public void startNextRound() {
+        finishCurrentRound();
+
         if (matchState.isMatchFinished(playerOne, playerTwo)) {
             matchStatus = MatchStatus.FINISHED;
             return;
@@ -249,6 +259,8 @@ public class Match {
      * @param startingPlayer the player that starts the next round
      */
     public void startNextRound(List<GameColor> fieldColors, Player startingPlayer) {
+        finishCurrentRound();
+
         if (matchState.isMatchFinished(playerOne, playerTwo)) {
             matchStatus = MatchStatus.FINISHED;
             return;
@@ -256,5 +268,22 @@ public class Match {
 
         matchState.nextRound();
         prepareNewRound(fieldColors, startingPlayer);
+    }
+
+
+    public void initializeCurrentRound(List<GameColor> fieldColors, Player startingPlayer) {
+        if (fieldColors == null) {
+            throw new NullPointerException("fieldColors cannot be null");
+        }
+        if (startingPlayer == null) {
+            throw new NullPointerException("startingPlayer cannot be null");
+        }
+
+        Player secondPlayer = getOtherPlayer(startingPlayer);
+
+        playerOne.reset();
+        playerTwo.reset();
+
+        gameState = new GameState(startingPlayer, secondPlayer, fieldColors);
     }
 }

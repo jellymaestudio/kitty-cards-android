@@ -1,5 +1,7 @@
 package kittycards.kittycardsandroid.model;
 
+import java.util.Objects;
+
 /**
  * Represents a number card in Kitty Cards.
  * <p>
@@ -55,5 +57,24 @@ public class Card {
      */
     public int getValue() {
         return value;
+    }
+
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
+        }
+
+        if (!(object instanceof Card other)) {
+            return false;
+        }
+
+        return value == other.value && color == other.color;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(color, value);
     }
 }
