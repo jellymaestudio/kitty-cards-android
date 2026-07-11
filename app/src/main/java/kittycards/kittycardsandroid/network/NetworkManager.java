@@ -14,6 +14,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.components.IProtocolEngine;
+import kittycards.kittycardsandroid.network.event.NetworkEvent;
+import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /**
  * calls the listener methods
@@ -30,31 +32,63 @@ public class NetworkManager implements INetworkManager {
 
     private static volatile NetworkManager instance;
 
-    private final Context context;
-    private final BluetoothAdapter bluetoothAdapter;
-    private final BluetoothManager bluetoothManager;
-
-    final Handler handler = new Handler(Looper.getMainLooper());
+    final BleHost bleHost;
+    final BleGuest bleGuest;
     final IProtocolEngine protocolEngine;
-    private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
+    final Handler handler = new Handler(Looper.getMainLooper());
 
     private volatile Role role = Role.NOT_CONNECTED;
-    private final BleGuest bleGuest;
-    private final BleHost bleHost;
+
+    private final BluetoothAdapter bluetoothAdapter;
+    private final BluetoothManager bluetoothManager;
+    private final Context context;
+
+    private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
+
+    private NetworkEventListener eventListener;
+
 
     // -------------------------------------------------------------------------
     // Singleton
     // -------------------------------------------------------------------------
-    private NetworkManager(Context context) {
+
+    private NetworkManager(Context context, BleHost bleHost, BleGuest bleGuest, boolean isTestInstance) {
         this.context = context.getApplicationContext();
         this.protocolEngine = new ProtocolEngine();
         this.bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.bluetoothAdapter = bluetoothManager.getAdapter();
-
-        this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
-        this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
+        this.bleGuest = bleGuest != null ? bleGuest : new BleGuest(this, this.context, this.bluetoothManager);
+        this.bleHost = bleHost != null ? bleHost : new BleHost(this, this.context, this.bluetoothManager);
     }
 
+    private NetworkManager(Context context) {
+        this(context, null, null, false);
+    }
+
+    // For testing purposes only
+    NetworkManager(Context context, BleHost bleHost, BleGuest bleGuest) {
+        this(context, bleHost, bleGuest, true);
+        instance = this;
+    }
+
+    // For testing purposes only
+    NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine) {
+        this.context = context.getApplicationContext();
+        this.protocolEngine = protocolEngine;
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager.getAdapter();
+        this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
+        this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
+        instance = this;
+    }
+
+    /**
+     * Returns the singleton instance of NetworkManager.
+     * Must be initialized with a Context first.
+     *
+     * @param context application context used for BLE setup
+     * @return singleton instance
+     */
     public static NetworkManager getInstance(Context context) {
         if (instance == null) {
             synchronized (NetworkManager.class) {
@@ -66,6 +100,12 @@ public class NetworkManager implements INetworkManager {
         return instance;
     }
 
+    /**
+     * Returns the already initialized singleton instance.
+     *
+     * @return NetworkManager instance
+     * @throws IllegalStateException if not initialized via getInstance(Context)
+     */
     public static NetworkManager getInstance() {
         if (instance == null) {
             throw new IllegalStateException("NetworkManager not initialized. Call getInstance(Context) first.");
@@ -77,7 +117,12 @@ public class NetworkManager implements INetworkManager {
     // BLE data receiving (Shared for Host and Guest)
     // -------------------------------------------------------------------------
 
-    // BLE background thread calls this when data arrives
+    /**
+     * Decodes raw BLE byte payload into a GameAction and enqueues it for consumption.
+     * Thread-safe and intended to be called from BLE callback threads.
+     *
+     * @param bytes raw BLE payload
+     */
     void decodeAndQueueDataSafe(byte[] bytes) {
         GameAction action = protocolEngine.decodeGameAction(bytes);
         try {
@@ -92,15 +137,18 @@ public class NetworkManager implements INetworkManager {
     // INetworkManager
     // -------------------------------------------------------------------------
 
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
+        if (role == Role.GUEST) disconnect();
         role = Role.HOST;
         bleHost.hostMatch(listener);
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void joinMatch(OnDeviceFoundListener listener) {
+        if (role == Role.HOST) disconnect();
         role = Role.GUEST;
         bleGuest.joinMatch(listener);
     }
@@ -111,12 +159,14 @@ public class NetworkManager implements INetworkManager {
         bleGuest.confirmRoom(room);
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void selectGuest(NetworkDevice guest) {
         bleHost.selectGuest(guest);
     }
 
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT})
+
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     @Override
     public void disconnect() {
         switch (role) {
@@ -140,16 +190,45 @@ public class NetworkManager implements INetworkManager {
         }
     }
 
+
     @Override
     public GameAction fetchNextAction() throws InterruptedException {
         return actionQueue.take(); // Blocks the calling thread until something is in the queue
     }
 
+    @Override
+    public void setNetworkEventListener(NetworkEventListener listener) {
+        this.eventListener = listener;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper
+    // -------------------------------------------------------------------------
+
+    /**
+     * Emits a network event to the registered listener on the main thread.
+     * Used by BLE components to forward status, warnings and errors to UI layer.
+     *
+     * @param type    event severity/type
+     * @param source  origin of the event (e.g. BleHost, BleGuest)
+     * @param message human-readable message
+     */
+    protected void emitEvent(NetworkEvent.NetworkMessageType type, String source, String message) {
+        handler.post(() -> {
+            if (eventListener != null) {
+                eventListener.onNetworkEvent(new NetworkEvent(type, message, source));
+            }
+        });
+    }
     // -------------------------------------------------------------------------
     // Getter/Setter
     // -------------------------------------------------------------------------
 
-
+    /**
+     * Returns the player's current role (HOST, GUEST, NOT_CONNECTED)
+     *
+     * @return the role
+     */
     public Role getRole() {
         return role;
     }

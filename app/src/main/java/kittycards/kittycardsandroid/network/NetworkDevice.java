@@ -5,8 +5,8 @@ import android.bluetooth.BluetoothDevice;
 
 /**
  * Represents a network device with a name and address.
- * @param deviceName Geräte-Name
- * @param deviceAddress Geräte-Adresse
+ * @param deviceName device name
+ * @param deviceAddress device address
  * @author red_concrete
  */
 public record NetworkDevice(String deviceName, String deviceAddress) {
