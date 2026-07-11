@@ -1,9 +1,11 @@
 package kittycards.kittycardsandroid.ui
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -11,6 +13,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.widget.ImageViewCompat
 import kittycards.kittycardsandroid.R
 import kittycards.kittycardsandroid.model.Card
 import kittycards.kittycardsandroid.model.GameColor
@@ -25,6 +28,13 @@ class GameActivity : AppCompatActivity() {
     private lateinit var opponentScoreText: TextView
     private lateinit var playerScoreText: TextView
     private lateinit var turnInfoText: TextView
+
+
+    private data class TestPlacedCard(
+        val card: Card,
+        val ownerIsHost: Boolean,
+        val displayedScore: Int
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,7 +142,7 @@ class GameActivity : AppCompatActivity() {
         boardContainer.removeAllViews()
 
         val fieldColors = listOf(
-            GameColor.PURPLE, GameColor.GREY, GameColor.PURPLE,
+            GameColor.GREY, GameColor.GREY, GameColor.PURPLE,
             GameColor.CYAN, GameColor.GREY, GameColor.GREEN,
             GameColor.GREY, GameColor.GREEN, GameColor.GREY
         )
@@ -155,11 +165,26 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-    private fun testPlacedCard(row: Int, column: Int): Card? {
+    private fun testPlacedCard(row: Int, column: Int): TestPlacedCard? {
         return when {
-            row == 0 && column == 0 -> Card(GameColor.PURPLE, 1)
-            row == 1 && column == 2 -> Card(GameColor.CYAN, 0.coerceAtLeast(1))
-            row == 2 && column == 1 -> Card(GameColor.GREEN, 6)
+            row == 0 && column == 0 -> TestPlacedCard(
+                card = Card(GameColor.PURPLE, 1),
+                ownerIsHost = true,
+                displayedScore = 1
+            )
+
+            row == 1 && column == 2 -> TestPlacedCard(
+                card = Card(GameColor.CYAN, 1),
+                ownerIsHost = false,
+                displayedScore = 0
+            )
+
+            row == 2 && column == 1 -> TestPlacedCard(
+                card = Card(GameColor.GREEN, 6),
+                ownerIsHost = true,
+                displayedScore = 12
+            )
+
             else -> null
         }
     }
@@ -221,10 +246,17 @@ class GameActivity : AppCompatActivity() {
         return cardView
     }
 
-    private fun createBoardFieldView(fieldColor: GameColor, placedCard: Card?): View {
-        val outer = LinearLayout(this).apply {
-            setBackgroundColor(GameColorMapper.toAndroidColor(fieldColor))
-            setPadding(8.dp(), 8.dp(), 8.dp(), 8.dp())
+    private fun createBoardFieldView(
+        fieldColor: GameColor,
+        placedCard: TestPlacedCard?
+    ): View {
+        /*
+         * Ebene 1:
+         * Dünner schwarzer Rand, der die einzelnen Felder voneinander trennt.
+         */
+        val blackBorder = FrameLayout(this).apply {
+            setBackgroundColor(getColor(android.R.color.black))
+            setPadding(1.dp(), 1.dp(), 1.dp(), 1.dp())
 
             layoutParams = GridLayout.LayoutParams().apply {
                 width = 100.dp()
@@ -232,31 +264,128 @@ class GameActivity : AppCompatActivity() {
             }
         }
 
-        val inner = TextView(this).apply {
-            text = placedCard?.value?.toString() ?: ""
-            textSize = 18f
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            setTextColor(getColor(android.R.color.black))
+        /*
+         * Ebene 2:
+         * Der farbige Rahmen des Feldes.
+         */
+        val fieldColorFrame = FrameLayout(this).apply {
             setBackgroundColor(
-                placedCard?.let { GameColorMapper.toAndroidColor(it.color) }
-                    ?: getColor(android.R.color.white)
+                GameColorMapper.toAndroidColor(fieldColor)
             )
-            setPadding(0, 8.dp(), 0, 0)
+            setPadding(7.dp(), 7.dp(), 7.dp(), 7.dp())
 
-            layoutParams = LinearLayout.LayoutParams(
+            layoutParams = FrameLayout.LayoutParams(
                 MATCH_PARENT,
                 MATCH_PARENT
             )
         }
 
-        outer.addView(inner)
-        return outer
+        /*
+         * Ebene 3:
+         * Die eigentliche Feldfläche.
+         *
+         * Leer       -> weiß
+         * Karte liegt -> Kartenfarbe
+         */
+        val cardArea = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+
+            setBackgroundColor(
+                placedCard?.let {
+                    GameColorMapper.toAndroidColor(it.card.color)
+                } ?: getColor(android.R.color.white)
+            )
+
+            layoutParams = FrameLayout.LayoutParams(
+                MATCH_PARENT,
+                MATCH_PARENT
+            )
+        }
+
+        if (placedCard != null) {
+            val scoreText = TextView(this).apply {
+                text = placedCard.displayedScore.toString()
+                textSize = 17f
+                gravity = Gravity.CENTER
+                setTextColor(getColor(android.R.color.black))
+                includeFontPadding = false
+
+                layoutParams = LinearLayout.LayoutParams(
+                    MATCH_PARENT,
+                    28.dp()
+                )
+            }
+
+            val kittyContainer = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    MATCH_PARENT,
+                    0,
+                    1f
+                ).apply {
+                    leftMargin = 6.dp()
+                    rightMargin = 6.dp()
+                    topMargin = 4.dp()
+                    bottomMargin = 2.dp()
+                }
+            }
+
+            val ownerColor = if (placedCard.ownerIsHost) {
+                getColor(R.color.kc_host)
+            } else {
+                getColor(R.color.kc_guest)
+            }
+
+            val kittyFill = ImageView(this).apply {
+                setImageResource(R.drawable.kitty_fill)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = null
+
+                ImageViewCompat.setImageTintList(
+                    this,
+                    ColorStateList.valueOf(ownerColor)
+                )
+
+                layoutParams = FrameLayout.LayoutParams(
+                    54.dp(),
+                    54.dp(),
+                    Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+                ).apply {
+                    bottomMargin = 2.dp()
+                }
+            }
+
+            val kittyOutline = ImageView(this).apply {
+                setImageResource(R.drawable.kitty_card)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = null
+
+                layoutParams = FrameLayout.LayoutParams(
+                    54.dp(),
+                    54.dp(),
+                    Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+                ).apply {
+                    bottomMargin = 2.dp()
+                }
+            }
+
+            kittyContainer.addView(kittyFill)
+            kittyContainer.addView(kittyOutline)
+
+            cardArea.addView(scoreText)
+            cardArea.addView(kittyContainer)
+        }
+
+        fieldColorFrame.addView(cardArea)
+        blackBorder.addView(fieldColorFrame)
+
+        return blackBorder
     }
 
     private fun createDrawPileView(): View {
-        val outer = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            setBackgroundColor(getColor(android.R.color.white))
+        val blackBorder = FrameLayout(this).apply {
+            setBackgroundColor(getColor(android.R.color.black))
+            setPadding(1.dp(), 1.dp(), 1.dp(), 1.dp())
 
             layoutParams = GridLayout.LayoutParams().apply {
                 width = 100.dp()
@@ -264,21 +393,59 @@ class GameActivity : AppCompatActivity() {
             }
         }
 
-        val pile = TextView(this).apply {
-            text = "Draw"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setTextColor(getColor(android.R.color.white))
-            setBackgroundColor(getColor(R.color.kc_dark_grey))
+        val drawField = FrameLayout(this).apply {
+            setBackgroundColor(getColor(android.R.color.white))
 
-            layoutParams = LinearLayout.LayoutParams(
-                52.dp(),
-                72.dp()
+            layoutParams = FrameLayout.LayoutParams(
+                MATCH_PARENT,
+                MATCH_PARENT
             )
         }
 
-        outer.addView(pile)
-        return outer
+        val pileContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                76.dp(),
+                76.dp(),
+                Gravity.CENTER
+            )
+        }
+
+        val pileImage = ImageView(this).apply {
+            setImageResource(R.drawable.draw_pile)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = null
+
+            layoutParams = FrameLayout.LayoutParams(
+                MATCH_PARENT,
+                MATCH_PARENT
+            )
+        }
+
+        val drawText = TextView(this).apply {
+            text = "Draw"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(getColor(android.R.color.white))
+
+            layoutParams = FrameLayout.LayoutParams(
+                48.dp(),
+                32.dp(),
+                Gravity.CENTER
+            )
+
+            // Verschiebt den Text in die Mitte der obersten Karte.
+            translationX = 4.dp().toFloat()
+            translationY = (-4).dp().toFloat()
+        }
+
+        pileContainer.addView(pileImage)
+        pileContainer.addView(drawText)
+
+        drawField.addView(pileContainer)
+        blackBorder.addView(drawField)
+
+        return blackBorder
     }
 
     private fun colorSortValue(color: GameColor): Int {
