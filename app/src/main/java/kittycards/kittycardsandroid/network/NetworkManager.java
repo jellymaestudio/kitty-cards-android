@@ -201,6 +201,10 @@ public class NetworkManager implements INetworkManager {
         this.eventListener = listener;
     }
 
+    public void setRoomConnectionListener(OnRoomConnectionListener listener) {
+        bleGuest.setRoomConnectionListener(listener);
+    }
+
     // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------

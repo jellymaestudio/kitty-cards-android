@@ -49,6 +49,7 @@ public class BleGuest {
     private boolean scanning = false;
     private final ArrayList<NetworkDevice> foundRooms = new ArrayList<>();
     private OnDeviceFoundListener deviceListener;
+    private OnRoomConnectionListener roomConnectionListener;
 
     private BluetoothGatt activeGattConnection;
     private BluetoothGattCharacteristic gattCharacteristic;
@@ -67,6 +68,12 @@ public class BleGuest {
         emitEvent(ERROR, "Write Timeout (" + WRITE_TIMEOUT_MS + "ms)");
         processNextWrite();
     };
+
+
+    public void setRoomConnectionListener(OnRoomConnectionListener listener) {
+        this.roomConnectionListener = listener;
+    }
+
 
     private final ScanCallback leScanCallback = new ScanCallback() {
         @Override
@@ -111,19 +118,31 @@ public class BleGuest {
                     connected = false;
                     emitEvent(ERROR, "Connection failed (status=" + status + ")");
 
-
                     if (activeGattConnection != null) {
                         activeGattConnection.close();
                     }
+
                     activeGattConnection = null;
                     gattCharacteristic = null;
                     outgoingQueue.clear();
                     writeInProgress = false;
+
+                    if (roomConnectionListener != null) {
+                        roomConnectionListener.onRoomDisconnected();
+                    }
+
                     return;
                 }
 
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     connected = true;
+
+                    if (roomConnectionListener != null) {
+                        roomConnectionListener.onRoomConnected(
+                                NetworkDevice.from(gatt.getDevice())
+                        );
+                    }
+
                     emitEvent(INFO, "Connected to host. Discovering services...");
                     boolean started = gatt.discoverServices();//"Discover" the services offered by the remote device (calls onServicesDiscovered() when done)
 
@@ -142,6 +161,10 @@ public class BleGuest {
                         activeGattConnection.close();
                     }
                     activeGattConnection = null;
+
+                    if (roomConnectionListener != null) {
+                        roomConnectionListener.onRoomDisconnected();
+                    }
                 }
             });
         }
