@@ -179,6 +179,18 @@ public class NetworkManager implements INetworkManager {
         actionQueue.clear();
     }
 
+    @RequiresPermission(allOf = {
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT
+    })
+    public void closeHostedRoom() {
+        if (role != Role.HOST) {
+            return;
+        }
+
+        bleHost.closeHostedRoom();
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void sendGameChange(GameAction action) {
@@ -224,6 +236,7 @@ public class NetworkManager implements INetworkManager {
             }
         });
     }
+
     // -------------------------------------------------------------------------
     // Getter/Setter
     // -------------------------------------------------------------------------

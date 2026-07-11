@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
 import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.network.event.NetworkEvent
@@ -32,19 +33,26 @@ class JoinActivity : AppCompatActivity() {
     private val availableRooms = mutableListOf<NetworkDevice>()
 
     /*
-     * Der Raum, zu dem gerade eine Verbindung aufgebaut wird.
+     * The room to which a connection is currently being established.
      *
-     * Wichtig:
-     * Dieser Host ist noch nicht automatisch Teil der Room-Box.
-     * Das passiert erst später nach GUEST_ACCEPTED.
+     * Important:
+     * This host is not yet automatically part of the room box.
+     * That happens later, after GUEST_ACCEPTED.
      */
     private var selectedRoom: NetworkDevice? = null
+    private var acceptedRoom: NetworkDevice? = null
+
+    @Volatile
+    private var lobbyListenerRunning = false
+
+    private var lobbyListenerThread: Thread? = null
 
     private lateinit var roomPlayersContainer: LinearLayout
     private lateinit var availableRoomsContainer: LinearLayout
 
     private var scanningStarted = false
     private var leavingScreen = false
+    private var resettingRoomConnection = false
 
     private val bluetoothPermissionLauncher =
         registerForActivityResult(
@@ -80,6 +88,7 @@ class JoinActivity : AppCompatActivity() {
         setupBackNavigation()
         setupNetworkEventListener()
         setupRoomConnectionListener()
+        startLobbyActionListener()
 
         renderRoom()
         renderAvailableRooms()
@@ -160,37 +169,14 @@ class JoinActivity : AppCompatActivity() {
 
                 override fun onRoomConnected(room: NetworkDevice) {
                     /*
-                     * In Phase A ist noch keine sichtbare Änderung nötig.
-                     * Der Host wird erst nach GUEST_ACCEPTED in der
-                     * Room-Box angezeigt.
+                     * No visible changes are necessary in Phase A.
+                     * The host is not displayed in the
+                     * Room box until after GUEST_ACCEPTED.
                      */
                 }
 
                 override fun onRoomDisconnected() {
-                    if (leavingScreen) {
-                        return
-                    }
-
-                    selectedRoom = null
-                    availableRooms.clear()
-
-                    renderRoom()
-                    renderAvailableRooms()
-
-                    scanningStarted = false
-
-                    /*
-                     * Kurze Verzögerung, damit BleGuest seine alte
-                     * Verbindung vollständig bereinigen kann.
-                     */
-                    availableRoomsContainer.postDelayed(
-                        {
-                            if (!leavingScreen) {
-                                startScanning()
-                            }
-                        },
-                        300L
-                    )
+                    handleRoomClosed()
                 }
             }
         )
@@ -252,21 +238,117 @@ class JoinActivity : AppCompatActivity() {
         }
     }
 
+    private fun startLobbyActionListener() {
+        if (lobbyListenerRunning) {
+            return
+        }
+
+        lobbyListenerRunning = true
+
+        lobbyListenerThread = Thread {
+            while (lobbyListenerRunning) {
+                try {
+                    val action = networkManager.fetchNextAction()
+
+                    when (action.type()) {
+                        GameAction.ActionType.GUEST_ACCEPTED -> {
+                            runOnUiThread {
+                                handleGuestAccepted()
+                            }
+                        }
+
+                        GameAction.ActionType.ROOM_CLOSED -> {
+                            runOnUiThread {
+                                handleRoomClosed()
+                            }
+                        }
+
+                        else -> {
+                            // Other actions are not handled during the lobby phase.
+                        }
+                    }
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            }
+        }.apply {
+            name = "JoinLobbyActionListener"
+            start()
+        }
+    }
+
+    private fun stopLobbyActionListener() {
+        lobbyListenerRunning = false
+        lobbyListenerThread?.interrupt()
+        lobbyListenerThread = null
+    }
+
+    private fun handleGuestAccepted() {
+        val pendingRoom = selectedRoom ?: return
+
+        acceptedRoom = pendingRoom
+        availableRooms.clear()
+
+        renderRoom()
+        renderAvailableRooms()
+    }
+
+    private fun handleRoomClosed() {
+        if (leavingScreen || resettingRoomConnection) {
+            return
+        }
+
+        resettingRoomConnection = true
+
+        selectedRoom = null
+        acceptedRoom = null
+        availableRooms.clear()
+
+        renderRoom()
+        renderAvailableRooms()
+
+        scanningStarted = false
+
+        /*
+         * Close the old GATT connection explicitly.
+         *
+         * ROOM_CLOSED may arrive before Android reports the physical
+         * BLE disconnection. Without this cleanup, the previous
+         * connection can remain internally active.
+         */
+        try {
+            networkManager.disconnect()
+        } catch (_: SecurityException) {
+            // Continue with the UI reset even if permission was revoked.
+        }
+
+        availableRoomsContainer.postDelayed(
+            {
+                if (!leavingScreen) {
+                    resettingRoomConnection = false
+                    startScanning()
+                }
+            },
+            500L
+        )
+    }
+
     private fun updateAvailableRooms(
         updatedRooms: List<NetworkDevice>
     ) {
         /*
-         * Solange noch kein Raum gewählt wurde, übernehmen wir
-         * vollständig die aktuelle Scan-Liste.
+         * As long as no room has been selected yet, we will
+         * copy the current scan list in its entirety.
          */
         if (selectedRoom == null) {
             availableRooms.clear()
             availableRooms.addAll(updatedRooms)
         } else {
             /*
-             * Nach der Auswahl stoppt BleGuest den Scan.
-             * Der ausgewählte Raum bleibt sichtbar, damit dort
-             * weiterhin "..." angezeigt werden kann.
+             * After the selection is made, BleGuest stops the scan.
+             * The selected room remains visible so that
+             * “...” can continue to be displayed there.
              */
             val pendingRoom = selectedRoom
 
@@ -287,20 +369,29 @@ class JoinActivity : AppCompatActivity() {
     private fun renderRoom() {
         roomPlayersContainer.removeAllViews()
 
-        /*
-         * In Phase A steht hier nur der aktuelle Guest.
-         * Der Host wird erst nach GUEST_ACCEPTED ergänzt.
-         */
         roomPlayersContainer.addView(
             createRoomPlayerRow(
                 text = "${getDeviceName()} (You)",
                 backgroundColor = getColor(R.color.kc_guest)
             )
         )
+
+        acceptedRoom?.let { room ->
+            roomPlayersContainer.addView(
+                createRoomPlayerRow(
+                    text = room.deviceName() ?: "Unknown Host",
+                    backgroundColor = getColor(R.color.kc_host)
+                )
+            )
+        }
     }
 
     private fun renderAvailableRooms() {
         availableRoomsContainer.removeAllViews()
+
+        if (acceptedRoom != null) {
+            return
+        }
 
         availableRooms.forEachIndexed { index, room ->
             availableRoomsContainer.addView(
@@ -396,9 +487,9 @@ class JoinActivity : AppCompatActivity() {
             )
 
             /*
-             * Sobald ein Raum gewählt wurde:
-             * - dessen Button zeigt "..."
-             * - alle anderen Buttons verschwinden
+             * Once a room has been selected:
+             * - its button displays “...”
+             * - all other buttons disappear
              */
             visibility = if (anotherRoomIsPending) {
                 View.INVISIBLE
@@ -436,8 +527,8 @@ class JoinActivity : AppCompatActivity() {
         }
 
         /*
-         * Erst nach dem erfolgreichen Methodenaufruf setzen wir
-         * den lokalen UI-Zustand auf "wartend".
+         * Only after the method has been successfully called do we
+         * set the local UI state to “waiting.”
          */
         selectedRoom = room
         renderAvailableRooms()
@@ -449,6 +540,7 @@ class JoinActivity : AppCompatActivity() {
         }
 
         leavingScreen = true
+        stopLobbyActionListener()
 
         try {
             networkManager.disconnect()
@@ -461,6 +553,8 @@ class JoinActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopLobbyActionListener()
+
         networkManager.setNetworkEventListener(null)
         networkManager.setRoomConnectionListener(null)
 
