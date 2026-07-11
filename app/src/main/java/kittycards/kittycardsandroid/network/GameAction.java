@@ -147,9 +147,12 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
         SELECT_CARD, //must be sent together with the selected card
         UNSELECT_CARD,
         PLAY_CARD, //must be specified together with the card being played and the board position
-        DEAL_CARD,
         SET_BOARD_COLOR, //must be specified together with the color being set and the board position
         SET_STARTING_PLAYER, //must be specified together with the contextSensitiveInt, which is the player index of the starting player (Host: 0 or Guest: 1)
-        MATCH_FINISHED
+
+        DEAL_CARD,
+        MATCH_FINISHED,
+        START_MATCH,
+        GUEST_ACCEPTED
     }
 }
