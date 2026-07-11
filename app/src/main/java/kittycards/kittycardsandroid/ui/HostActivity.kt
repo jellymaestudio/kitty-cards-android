@@ -388,7 +388,7 @@ class HostActivity : AppCompatActivity() {
         leavingScreen = true
 
         try {
-            networkManager.disconnect()
+            networkManager.closeHostedRoom()
         } catch (_: SecurityException) {
             // The Activity can still close if permission was revoked.
         }

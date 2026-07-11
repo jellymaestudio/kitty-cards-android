@@ -102,7 +102,142 @@ public class BleGuest {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             networkManager.handler.post(() -> {
+
+                /*
+                 * Status 133 may occur occasionally during the initial connection establishment
+                 *. In that case, we try again.
+                 *
+                 * However, if the connection was already established, we treat this
+                 * as a genuine connection loss.
+                 */
                 if (status == 133) {
+                    boolean wasConnected = connected;
+
+                    emitEvent(
+                            WARNING,
+                            wasConnected
+                                    ? "Connection to host was lost"
+                                    : "GATT_ERROR (133) - retrying connection"
+                    );
+
+                    clearConnectionState(gatt);
+
+                    if (wasConnected) {
+                        notifyRoomDisconnected();
+                        return;
+                    }
+
+                    BluetoothDevice device = gatt.getDevice();
+
+                    networkManager.handler.postDelayed(
+                            () -> activeGattConnection =
+                                    device.connectGatt(
+                                            context,
+                                            false,
+                                            gattCallback
+                                    ),
+                            300L
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Any other unsuccessful status means:
+                 * The connection could not be established
+                 * or was unexpectedly terminated.
+                 */
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    emitEvent(
+                            ERROR,
+                            "Connection failed or was lost (status="
+                                    + status
+                                    + ")"
+                    );
+
+                    clearConnectionState(gatt);
+                    notifyRoomDisconnected();
+                    return;
+                }
+
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    connected = true;
+                    activeGattConnection = gatt;
+
+                    if (roomConnectionListener != null) {
+                        roomConnectionListener.onRoomConnected(
+                                NetworkDevice.from(gatt.getDevice())
+                        );
+                    }
+
+                    emitEvent(
+                            INFO,
+                            "Connected to host. Discovering services..."
+                    );
+
+                    boolean started = gatt.discoverServices();
+
+                    if (!started) {
+                        emitEvent(
+                                ERROR,
+                                "Service discovery could not be started"
+                        );
+                    }
+
+                } else if (
+                        newState == BluetoothProfile.STATE_DISCONNECTED
+                ) {
+                    emitEvent(WARNING, "Disconnected from host");
+
+                    clearConnectionState(gatt);
+                    notifyRoomDisconnected();
+                }
+            });
+
+            /* OLD VERSION
+            networkManager.handler.post(() -> {
+                if (status == 133) {
+                    boolean wasConnected = connected;
+
+                    emitEvent(
+                            WARNING,
+                            wasConnected
+                                    ? "Connection to host was lost"
+                                    : "GATT_ERROR (133) - retrying connection"
+                    );
+
+                    if (activeGattConnection != null) {
+                        activeGattConnection.close();
+                    }
+
+                    activeGattConnection = null;
+                    gattCharacteristic = null;
+                    connected = false;
+
+                    networkManager.handler.removeCallbacks(writeTimeoutRunnable);
+                    outgoingQueue.clear();
+                    writeInProgress = false;
+
+                    if (wasConnected) {
+                        if (roomConnectionListener != null) {
+                            roomConnectionListener.onRoomDisconnected();
+                        }
+
+                        return;
+                    }
+
+                    BluetoothDevice device = gatt.getDevice();
+
+                    networkManager.handler.postDelayed(
+                            () -> activeGattConnection =
+                                    device.connectGatt(context, false, gattCallback),
+                            300
+                    );
+
+                    return;
+                }
+
+                //if (status == 133) {
                     emitEvent(WARNING, "GATT_ERROR (133) - Retry wird versucht");
                     if (activeGattConnection != null) {
                         activeGattConnection.close();
@@ -166,7 +301,47 @@ public class BleGuest {
                         roomConnectionListener.onRoomDisconnected();
                     }
                 }
-            });
+            });*/
+        }
+
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+        private void clearConnectionState(BluetoothGatt gatt) {
+            connected = false;
+
+            networkManager.handler.removeCallbacks(
+                    writeTimeoutRunnable
+            );
+
+            outgoingQueue.clear();
+            writeInProgress = false;
+            gattCharacteristic = null;
+
+            if (gatt != null) {
+                try {
+                    gatt.close();
+                } catch (Exception ignored) {
+                    // Connection may already be closed by Android.
+                }
+            }
+
+            if (
+                    activeGattConnection != null
+                            && activeGattConnection != gatt
+            ) {
+                try {
+                    activeGattConnection.close();
+                } catch (Exception ignored) {
+                    // Connection may already be closed by Android.
+                }
+            }
+
+            activeGattConnection = null;
+        }
+
+        private void notifyRoomDisconnected() {
+            if (roomConnectionListener != null) {
+                roomConnectionListener.onRoomDisconnected();
+            }
         }
 
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

@@ -54,6 +54,7 @@ public class BleHost {
 
     private final Queue<byte[]> outgoingQueue = new LinkedList<>();
     private boolean notificationInProgress = false;
+    private boolean disconnectAfterQueueIsEmpty = false;
 
     private final AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
 
@@ -176,6 +177,7 @@ public class BleHost {
                         selectedGuestDevice = null;
                         outgoingQueue.clear();
                         notificationInProgress = false;
+                        disconnectAfterQueueIsEmpty = false;
                         // TODO: Inform GameController/UI that the active game partner lost connection
                     }
                 }
@@ -305,6 +307,21 @@ public class BleHost {
             }
             networkManager.handler.post(() -> {
                 notificationInProgress = false;
+
+                /*
+                 * The transmitted message was the final queued message.
+                 * ROOM_CLOSED has therefore been sent and the connection can
+                 * now be closed safely.
+                 */
+                if (
+                        disconnectAfterQueueIsEmpty
+                                && outgoingQueue.isEmpty()
+                ) {
+                    disconnectAfterQueueIsEmpty = false;
+                    disconnect();
+                    return;
+                }
+
                 processNextNotification();
             });
         }
@@ -478,18 +495,37 @@ public class BleHost {
      *     <li>Selecting a non-connected guest fails.</li>
      * </ul>
      *
-     * @param guest Guest chosen for the game session.
+     * @param guest Guest chosen for the game session
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void selectGuest(NetworkDevice guest) {
         networkManager.handler.post(() -> {
-            if (!connectedGuests.contains(guest) || bluetoothAdapter == null || bluetoothGattServer == null) {
-                emitEvent(ERROR, "Guest selection failed (not connected)");
+            if (guest == null) {
+                emitEvent(ERROR, "Guest selection failed: guest is null");
                 return;
             }
 
-            emitEvent(INFO, "Selecting guest as active partner: " + guest.deviceAddress()); // <-- NEU: Partner ausgewählt
+            if (
+                    !connectedGuests.contains(guest)
+                            || bluetoothAdapter == null
+                            || bluetoothGattServer == null
+                            || serverCharacteristic == null
+            ) {
+                emitEvent(ERROR, "Guest selection failed: guest is not connected");
+                return;
+            }
+
+            emitEvent(
+                    INFO,
+                    "Selecting guest as active partner: " + guest.deviceAddress()
+            );
+
             selectedGuestDevice = bluetoothAdapter.getRemoteDevice(guest.deviceAddress());
+
+            /*
+             * Inform the selected guest before disconnecting the remaining connected devices.
+             */
+            sendGameChange(new GameAction(GameAction.ActionType.GUEST_ACCEPTED));
 
             for (NetworkDevice other : new ArrayList<>(connectedGuests)) {
                 if (!other.equals(guest)) {
@@ -498,10 +534,43 @@ public class BleHost {
                 }
             }
         });
-        // TODO: Validate that responseNeeded handling and cancelConnection() don't race —
-        //  multiple onConnectionStateChange(DISCONNECTED) callbacks will fire here,
-        //  each triggering guestListener.onGuestListUpdated(). Debounce if this causes
-        //  unwanted UI flicker.
+    }
+
+    /**
+     * Closes the hosted room.
+     *
+     * <p>If an active guest is selected, the guest is informed through a
+     * {@link GameAction.ActionType#ROOM_CLOSED} action before the BLE connection
+     * is closed. If no guest is selected, the host disconnects immediately.</p>
+     */
+    @RequiresPermission(allOf = {
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT
+    })
+    public void closeHostedRoom() {
+        networkManager.handler.post(() -> {
+            if (
+                    selectedGuestDevice == null
+                            || bluetoothGattServer == null
+                            || serverCharacteristic == null
+            ) {
+                disconnect();
+                return;
+            }
+
+            disconnectAfterQueueIsEmpty = true;
+
+            byte[] data = networkManager.protocolEngine.encodeGameAction(
+                    new GameAction(GameAction.ActionType.ROOM_CLOSED)
+            );
+
+            /*
+             * ROOM_CLOSED is placed behind any notification that may already
+             * be waiting, such as GUEST_ACCEPTED.
+             */
+            outgoingQueue.add(data);
+            processNextNotification();
+        });
     }
 
     /**
@@ -534,6 +603,8 @@ public class BleHost {
     public void disconnect() {
         networkManager.handler.post(() -> {
             emitEvent(INFO, "Host is stopping advertising and closing GATT server");
+
+            disconnectAfterQueueIsEmpty = false;
             outgoingQueue.clear();
             notificationInProgress = false;
 
