@@ -1,5 +1,7 @@
 package kittycards.kittycardsandroid.logic;
 
+import android.annotation.SuppressLint;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +38,7 @@ public class GameController implements IGameController {
 
     private Match match;
     private Player localPlayer;
-    private Role role = Role.NOT_CONNECTED;
+    private volatile Role role = Role.NOT_CONNECTED;
     private final List<GameColor> receivedBoardColors = new ArrayList<>();
     private Player receivedStartingPlayer;
     private MoveValidator moveValidator;
@@ -45,6 +47,8 @@ public class GameController implements IGameController {
     private static final int STARTING_PLAYER_INITIAL_CARDS = 2;
     private static final int SECOND_PLAYER_INITIAL_CARDS = 3;
     private boolean initialRoundSetupReceived;
+    private volatile boolean listeningForActions;
+    private Thread actionListenerThread;
 
 
     // --- Constructor ---
@@ -133,6 +137,15 @@ public class GameController implements IGameController {
         this.role = role;
     }
 
+    /**
+     * Returns whether the controller currently listens for network actions.
+     *
+     * @return true if the action listener is running
+     */
+    public boolean isListeningForActions() {
+        return listeningForActions;
+    }
+
 
     // --- Public Game Actions ---
 
@@ -210,21 +223,113 @@ public class GameController implements IGameController {
     // --- Remote Action Handling ---
 
     /**
-     * Starts a background thread that continuously listens for incoming
-     * game actions from the remote device.
+     * Starts the background listener for incoming game actions.
+     *
+     * <p>Only one listener thread may run at a time.</p>
+     *
+     * @throws IllegalStateException if the controller has not been configured
+     *                               for a network match
      */
-    public void startListeningForActions() {
-        new Thread(() -> {
-            while (role != Role.NOT_CONNECTED) {
-                try {
-                    GameAction action = networkManager.fetchNextAction();
+    public synchronized void startListeningForActions() {
+        if (listeningForActions) {
+            return;
+        }
+
+        if (networkManager == null) {
+            throw new IllegalStateException(
+                    "NetworkManager must be set before starting the action listener"
+            );
+        }
+
+        if (role == Role.NOT_CONNECTED) {
+            throw new IllegalStateException(
+                    "Network role must be set before starting the action listener"
+            );
+        }
+
+        listeningForActions = true;
+
+        actionListenerThread = new Thread(() -> {
+            try {
+                while (
+                        listeningForActions
+                                && role != Role.NOT_CONNECTED
+                ) {
+                    GameAction action =
+                            networkManager.fetchNextAction();
+
+                    /*
+                     * The session may have been stopped while this thread
+                     * was waiting for the next action.
+                     */
+                    if (
+                            !listeningForActions
+                                    || role == Role.NOT_CONNECTED
+                    ) {
+                        break;
+                    }
+
                     handleRemoteAction(action);
-                } catch (InterruptedException e) {
-                    role = Role.NOT_CONNECTED;
-                    Thread.currentThread().interrupt();
+                }
+            } catch (InterruptedException exception) {
+                /*
+                 * Interrupting is the expected way to stop the blocking
+                 * fetchNextAction() call.
+                 */
+                Thread.currentThread().interrupt();
+            } finally {
+                synchronized (GameController.this) {
+                    listeningForActions = false;
+
+                    if (
+                            actionListenerThread
+                                    == Thread.currentThread()
+                    ) {
+                        actionListenerThread = null;
+                    }
                 }
             }
-        }).start();
+        }, "GameActionListener");
+
+        actionListenerThread.start();
+    }
+
+    /**
+     * Stops the background listener for incoming game actions.
+     *
+     * <p>The listener thread is interrupted so that a blocking
+     * fetchNextAction() call returns immediately.</p>
+     */
+    public synchronized void stopListeningForActions() {
+        listeningForActions = false;
+
+        if (actionListenerThread != null) {
+            actionListenerThread.interrupt();
+            actionListenerThread = null;
+        }
+    }
+
+    /**
+     * Clears all data belonging to the current game session.
+     *
+     * <p>This method must be called when a match ends or is aborted,
+     * before another lobby or match session is started.</p>
+     */
+    public synchronized void resetSession() {
+        stopListeningForActions();
+
+        role = Role.NOT_CONNECTED;
+
+        match = null;
+        localPlayer = null;
+        moveValidator = null;
+
+        receivedBoardColors.clear();
+        receivedStartingPlayer = null;
+        initialRoundSetupReceived = false;
+
+        onStateChangedListener = null;
+        networkManager = null;
     }
 
     /**
@@ -444,6 +549,7 @@ public class GameController implements IGameController {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private void sendGameAction(GameAction action) {
         if (networkManager != null) {
             networkManager.sendGameChange(action);
