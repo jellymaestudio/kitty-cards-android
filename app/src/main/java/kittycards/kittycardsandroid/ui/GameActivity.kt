@@ -1,6 +1,10 @@
 package kittycards.kittycardsandroid.ui
 
+import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -14,11 +18,13 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.ImageViewCompat
 import kittycards.kittycardsandroid.R
 import kittycards.kittycardsandroid.logic.GameController
+import kittycards.kittycardsandroid.logic.GameSessionController
 import kittycards.kittycardsandroid.model.Card
 import kittycards.kittycardsandroid.model.Field
 import kittycards.kittycardsandroid.model.GameColor
@@ -26,6 +32,7 @@ import kittycards.kittycardsandroid.model.MatchStatus
 import kittycards.kittycardsandroid.model.RoundResult
 import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
+import kittycards.kittycardsandroid.network.OnGameConnectionListener
 
 class GameActivity : AppCompatActivity() {
 
@@ -41,39 +48,37 @@ class GameActivity : AppCompatActivity() {
 
     private var lastCurrentPlayerId: Int? = null
     private var matchEndHandled = false
+    private var sessionEnding = false
+    private var bluetoothReceiverRegistered = false
 
-    private val returnToLobbyRunnable = Runnable {
-        /*
-         * Stop the game listener first so that it cannot consume
-         * lobby actions from the next session.
-         */
-        gameController.stopListeningForActions()
+    private val bluetoothStateReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?
+            ) {
+                if (
+                    intent?.action !=
+                    BluetoothAdapter.ACTION_STATE_CHANGED
+                ) {
+                    return
+                }
 
-        try {
-            NetworkManager.getInstance().disconnect()
-        } catch (_: SecurityException) {
-            // Navigation should still work if permission was revoked.
+                val state = intent.getIntExtra(
+                    BluetoothAdapter.EXTRA_STATE,
+                    BluetoothAdapter.ERROR
+                )
+
+                if (
+                    state == BluetoothAdapter.STATE_TURNING_OFF ||
+                    state == BluetoothAdapter.STATE_OFF
+                ) {
+                    handleOpponentDisconnected()
+                }
+            }
         }
-
-        /*
-         * Clear all players, match data and temporary setup data
-         * from the finished session.
-         */
-        gameController.resetSession()
-
-        val intent = Intent(
-            this,
-            LobbyActivity::class.java
-        ).apply {
-            flags =
-                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-
-        startActivity(intent)
-        finish()
-    }
     private lateinit var gameController: GameController
+    private lateinit var gameSessionController: GameSessionController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,11 +91,27 @@ class GameActivity : AppCompatActivity() {
 
         gameController = GameController.getInstance()
 
+        gameSessionController = GameSessionController(
+            gameController = gameController,
+            networkManager = NetworkManager.getInstance()
+        )
+
+        setupSessionControllerCallbacks()
+
         gameController.setOnStateChangedListener {
             runOnUiThread {
                 renderGameState()
             }
         }
+
+        gameController.setOnMatchAbortedListener {
+            runOnUiThread {
+                handleOpponentDisconnected()
+            }
+        }
+
+        setupGameConnectionListener()
+        registerBluetoothStateReceiver()
 
         renderGameState()
     }
@@ -749,9 +770,9 @@ class GameActivity : AppCompatActivity() {
         val matchState = match.matchState
 
         matchEndHandled = true
+        sessionEnding = true
 
         turnInfoText.removeCallbacks(hideTurnInfoRunnable)
-        turnInfoText.removeCallbacks(returnToLobbyRunnable)
 
         turnInfoText.text = when {
             matchState.isDraw -> {
@@ -769,19 +790,9 @@ class GameActivity : AppCompatActivity() {
 
         turnInfoText.visibility = View.VISIBLE
 
-        turnInfoText.postDelayed(
-            returnToLobbyRunnable,
-            3_000L
+        gameSessionController.finishRegularSession(
+            delayMillis = 3_000L
         )
-    }
-
-    override fun onDestroy() {
-        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
-        turnInfoText.removeCallbacks(returnToLobbyRunnable)
-
-        gameController.setOnStateChangedListener(null)
-
-        super.onDestroy()
     }
 
     private fun getLocalPlayerColor(): Int {
@@ -797,6 +808,111 @@ class GameActivity : AppCompatActivity() {
             getColor(R.color.kc_guest)
         } else {
             getColor(R.color.kc_host)
+        }
+    }
+
+    private fun setupGameConnectionListener() {
+        NetworkManager.getInstance()
+            .setGameConnectionListener(
+                object : OnGameConnectionListener {
+                    override fun onGamePartnerDisconnected() {
+                        handleOpponentDisconnected()
+                    }
+                }
+            )
+    }
+
+    private fun setupSessionControllerCallbacks() {
+        gameSessionController.onOpponentDisconnected = {
+            sessionEnding = true
+            showOpponentDisconnectedMessage()
+        }
+
+        gameSessionController.onSessionClosed = {
+            openLobby()
+        }
+    }
+
+    private fun showOpponentDisconnectedMessage() {
+        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+        turnInfoText.text = "Opponent disconnected"
+        turnInfoText.visibility = View.VISIBLE
+    }
+
+    private fun openLobby() {
+        val intent = Intent(
+            this,
+            LobbyActivity::class.java
+        ).apply {
+            flags =
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        startActivity(intent)
+        finish()
+    }
+
+    private fun handleOpponentDisconnected() {
+        if (matchEndHandled) {
+            return
+        }
+
+        gameSessionController.handleRemoteDisconnect(
+            delayMillis = 2_000L
+        )
+    }
+
+    private fun registerBluetoothStateReceiver() {
+        if (bluetoothReceiverRegistered) {
+            return
+        }
+
+        ContextCompat.registerReceiver(
+            this,
+            bluetoothStateReceiver,
+            IntentFilter(
+                BluetoothAdapter.ACTION_STATE_CHANGED
+            ),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        bluetoothReceiverRegistered = true
+    }
+
+    override fun onDestroy() {
+        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+
+        NetworkManager.getInstance()
+            .setGameConnectionListener(null)
+
+        gameController.setOnStateChangedListener(null)
+        gameController.setOnMatchAbortedListener(null)
+
+        gameSessionController.cleanup()
+
+        if (bluetoothReceiverRegistered) {
+            unregisterReceiver(bluetoothStateReceiver)
+            bluetoothReceiverRegistered = false
+        }
+
+        super.onDestroy()
+    }
+
+    override fun onStop() {
+        super.onStop()
+
+        if (
+            !isChangingConfigurations &&
+            !sessionEnding &&
+            !matchEndHandled &&
+            !gameSessionController.isSessionEnding()
+        ) {
+            sessionEnding = true
+
+            gameSessionController.abortLocalSession(
+                sendDelayMillis = 400L
+            )
         }
     }
 

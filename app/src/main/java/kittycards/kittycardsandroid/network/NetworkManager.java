@@ -46,6 +46,7 @@ public class NetworkManager implements INetworkManager {
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
 
     private NetworkEventListener eventListener;
+    private OnGameConnectionListener gameConnectionListener;
 
 
     // -------------------------------------------------------------------------
@@ -211,6 +212,14 @@ public class NetworkManager implements INetworkManager {
         }
     }
 
+    void notifyGamePartnerDisconnected() {
+        handler.post(() -> {
+            if (gameConnectionListener != null) {
+                gameConnectionListener.onGamePartnerDisconnected();
+            }
+        });
+    }
+
 
     @Override
     public GameAction fetchNextAction() throws InterruptedException {
@@ -224,6 +233,10 @@ public class NetworkManager implements INetworkManager {
 
     public void setRoomConnectionListener(OnRoomConnectionListener listener) {
         bleGuest.setRoomConnectionListener(listener);
+    }
+
+    public void setGameConnectionListener(OnGameConnectionListener listener) {
+        this.gameConnectionListener = listener;
     }
 
     // -------------------------------------------------------------------------

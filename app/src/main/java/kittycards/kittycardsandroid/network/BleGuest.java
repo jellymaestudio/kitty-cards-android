@@ -342,6 +342,8 @@ public class BleGuest {
             if (roomConnectionListener != null) {
                 roomConnectionListener.onRoomDisconnected();
             }
+
+            networkManager.notifyGamePartnerDisconnected();
         }
 
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
