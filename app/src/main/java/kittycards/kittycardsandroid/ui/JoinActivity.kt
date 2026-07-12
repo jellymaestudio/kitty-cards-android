@@ -1,6 +1,7 @@
 package kittycards.kittycardsandroid.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -19,12 +20,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.logic.GameController
+import kittycards.kittycardsandroid.model.Player
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
 import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.network.event.NetworkEvent
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 import kittycards.kittycardsandroid.network.OnRoomConnectionListener
+import kittycards.kittycardsandroid.network.Role
 
 class JoinActivity : AppCompatActivity() {
 
@@ -263,6 +267,20 @@ class JoinActivity : AppCompatActivity() {
                             }
                         }
 
+                        GameAction.ActionType.START_MATCH -> {
+                            /*
+                             * Stop the lobby listener before the GameController starts
+                             * consuming actions from the same NetworkManager queue.
+                             */
+                            lobbyListenerRunning = false
+
+                            runOnUiThread {
+                                handleStartMatch()
+                            }
+
+                            break
+                        }
+
                         else -> {
                             // Other actions are not handled during the lobby phase.
                         }
@@ -280,7 +298,13 @@ class JoinActivity : AppCompatActivity() {
 
     private fun stopLobbyActionListener() {
         lobbyListenerRunning = false
-        lobbyListenerThread?.interrupt()
+
+        lobbyListenerThread?.let { thread ->
+            if (thread != Thread.currentThread()) {
+                thread.interrupt()
+            }
+        }
+
         lobbyListenerThread = null
     }
 
@@ -292,6 +316,77 @@ class JoinActivity : AppCompatActivity() {
 
         renderRoom()
         renderAvailableRooms()
+    }
+
+    private fun handleStartMatch() {
+        if (leavingScreen) {
+            return
+        }
+
+        val hostRoom = acceptedRoom
+
+        if (hostRoom == null) {
+            Toast.makeText(
+                this,
+                "The match cannot start because no host was accepted.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        /*
+         * The lobby listener already stopped itself after receiving
+         * START_MATCH. We only clear the stored thread reference here.
+         */
+        lobbyListenerThread = null
+
+        val hostPlayer = Player(
+            0,
+            "Host"
+        )
+
+        val guestPlayer = Player(
+            1,
+            "Guest"
+        )
+
+        val gameController = GameController.getInstance()
+
+        gameController.setNetworkManager(networkManager)
+        gameController.setNetworkRole(Role.GUEST)
+        gameController.setLocalPlayer(guestPlayer)
+
+        /*
+         * On the guest device this only initializes the local match.
+         * It does not send board colors or cards because the role is GUEST.
+         */
+        gameController.startMatch(
+            hostPlayer,
+            guestPlayer
+        )
+
+        /*
+         * From this point onward, the GameController is the only consumer
+         * of incoming gameplay actions.
+         */
+        gameController.startListeningForActions()
+
+        try {
+            networkManager.sendGameChange(
+                GameAction(
+                    GameAction.ActionType.MATCH_READY
+                )
+            )
+        } catch (_: SecurityException) {
+            Toast.makeText(
+                this,
+                "Bluetooth permission is missing.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        openGameScreen()
     }
 
     private fun handleRoomClosed() {
@@ -549,6 +644,17 @@ class JoinActivity : AppCompatActivity() {
         }
 
         scanningStarted = false
+        finish()
+    }
+
+    private fun openGameScreen() {
+        startActivity(
+            Intent(
+                this,
+                GameActivity::class.java
+            )
+        )
+
         finish()
     }
 

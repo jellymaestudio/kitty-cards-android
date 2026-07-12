@@ -191,6 +191,15 @@ public class NetworkManager implements INetworkManager {
         bleHost.closeHostedRoom();
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    public void stopRoomDiscovery() {
+        if (role != Role.HOST) {
+            return;
+        }
+
+        bleHost.stopRoomDiscovery();
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @Override
     public void sendGameChange(GameAction action) {
