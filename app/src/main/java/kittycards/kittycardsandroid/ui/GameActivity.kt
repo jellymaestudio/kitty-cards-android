@@ -1,5 +1,6 @@
 package kittycards.kittycardsandroid.ui
 
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -21,6 +22,9 @@ import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Card
 import kittycards.kittycardsandroid.model.Field
 import kittycards.kittycardsandroid.model.GameColor
+import kittycards.kittycardsandroid.model.MatchStatus
+import kittycards.kittycardsandroid.model.RoundResult
+import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 
 class GameActivity : AppCompatActivity() {
@@ -36,6 +40,39 @@ class GameActivity : AppCompatActivity() {
     private lateinit var playerHandScrollView: HorizontalScrollView
 
     private var lastCurrentPlayerId: Int? = null
+    private var matchEndHandled = false
+
+    private val returnToLobbyRunnable = Runnable {
+        /*
+         * Stop the game listener first so that it cannot consume
+         * lobby actions from the next session.
+         */
+        gameController.stopListeningForActions()
+
+        try {
+            NetworkManager.getInstance().disconnect()
+        } catch (_: SecurityException) {
+            // Navigation should still work if permission was revoked.
+        }
+
+        /*
+         * Clear all players, match data and temporary setup data
+         * from the finished session.
+         */
+        gameController.resetSession()
+
+        val intent = Intent(
+            this,
+            LobbyActivity::class.java
+        ).apply {
+            flags =
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        startActivity(intent)
+        finish()
+    }
     private lateinit var gameController: GameController
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,10 +143,6 @@ class GameActivity : AppCompatActivity() {
         )
 
         updateHandBoxSizes(isLocalPlayersTurn)
-        updateTurnMessage(
-            currentPlayerId = gameState.currentPlayer.id,
-            isLocalPlayersTurn = isLocalPlayersTurn
-        )
 
         renderRoundResults()
         renderBoard()
@@ -124,6 +157,15 @@ class GameActivity : AppCompatActivity() {
         opponentScoreText.setBackgroundColor(
             getRemotePlayerColor()
         )
+
+        if (match.matchStatus == MatchStatus.FINISHED) {
+            showMatchResult()
+        } else {
+            updateTurnMessage(
+                currentPlayerId = gameState.currentPlayer.id,
+                isLocalPlayersTurn = isLocalPlayersTurn
+            )
+        }
     }
 
     private fun renderOpponentHand(
@@ -163,27 +205,50 @@ class GameActivity : AppCompatActivity() {
     private fun renderRoundResults() {
         roundResultContainer.removeAllViews()
 
-        val colors = listOf(
-            getColor(R.color.kc_guest),
-            getColor(R.color.kc_host),
-            getColor(android.R.color.white)
-        )
+        val matchState = gameController.match
+            ?.matchState
+            ?: return
 
-        colors.forEachIndexed { index, color ->
-            roundResultContainer.addView(
-                View(this).apply {
-                    setBackgroundColor(color)
-                    layoutParams = LinearLayout.LayoutParams(
-                        0,
-                        MATCH_PARENT,
-                        1f
-                    ).apply {
-                        if (index < colors.lastIndex) {
-                            marginEnd = 2.dp()
-                        }
-                    }
+        val roundResults = matchState.roundResults
+
+        for (roundIndex in 0 until matchState.maxRounds) {
+            val result = roundResults.getOrNull(roundIndex)
+
+            val resultView = when (result) {
+                RoundResult.PLAYER_ONE_WIN -> {
+                    createSolidRoundResultView(
+                        getColor(R.color.kc_host)
+                    )
                 }
-            )
+
+                RoundResult.PLAYER_TWO_WIN -> {
+                    createSolidRoundResultView(
+                        getColor(R.color.kc_guest)
+                    )
+                }
+
+                RoundResult.DRAW -> {
+                    createDrawRoundResultView()
+                }
+
+                null -> {
+                    createSolidRoundResultView(
+                        getColor(android.R.color.white)
+                    )
+                }
+            }
+
+            resultView.layoutParams = LinearLayout.LayoutParams(
+                0,
+                MATCH_PARENT,
+                1f
+            ).apply {
+                if (roundIndex < matchState.maxRounds - 1) {
+                    marginEnd = 2.dp()
+                }
+            }
+
+            roundResultContainer.addView(resultView)
         }
     }
 
@@ -205,7 +270,11 @@ class GameActivity : AppCompatActivity() {
                     val field = board.getField(row, column)
 
                     boardContainer.addView(
-                        createBoardFieldView(field)
+                        createBoardFieldView(
+                            field = field,
+                            row = row,
+                            column = column
+                        )
                     )
                 }
             }
@@ -330,7 +399,9 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun createBoardFieldView(
-        field: Field
+        field: Field,
+        row: Int,
+        column: Int
     ): View {
         val placedCard = field.card
 
@@ -341,6 +412,21 @@ class GameActivity : AppCompatActivity() {
             layoutParams = GridLayout.LayoutParams().apply {
                 width = 100.dp()
                 height = 100.dp()
+            }
+
+            isClickable = true
+            isFocusable = true
+
+            setOnClickListener {
+                val localPlayer =
+                    gameController.localPlayer
+                        ?: return@setOnClickListener
+
+                gameController.playCard(
+                    localPlayer,
+                    row,
+                    column
+                )
             }
         }
 
@@ -465,6 +551,17 @@ class GameActivity : AppCompatActivity() {
                 width = 100.dp()
                 height = 100.dp()
             }
+
+            isClickable = true
+            isFocusable = true
+
+            setOnClickListener {
+                val localPlayer =
+                    gameController.localPlayer
+                        ?: return@setOnClickListener
+
+                gameController.drawCard(localPlayer)
+            }
         }
 
         val drawField = FrameLayout(this).apply {
@@ -520,6 +617,48 @@ class GameActivity : AppCompatActivity() {
         blackBorder.addView(drawField)
 
         return blackBorder
+    }
+
+    private fun createSolidRoundResultView(
+        color: Int
+    ): View {
+        return View(this).apply {
+            setBackgroundColor(color)
+        }
+    }
+
+    private fun createDrawRoundResultView(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+
+            addView(
+                View(this@GameActivity).apply {
+                    setBackgroundColor(
+                        getColor(R.color.kc_host)
+                    )
+
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        MATCH_PARENT,
+                        1f
+                    )
+                }
+            )
+
+            addView(
+                View(this@GameActivity).apply {
+                    setBackgroundColor(
+                        getColor(R.color.kc_guest)
+                    )
+
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        MATCH_PARENT,
+                        1f
+                    )
+                }
+            )
+        }
     }
 
     private fun updateHandBoxSizes(
@@ -600,8 +739,46 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
+    private fun showMatchResult() {
+        if (matchEndHandled) {
+            return
+        }
+
+        val match = gameController.match ?: return
+        val localPlayer = gameController.localPlayer ?: return
+        val matchState = match.matchState
+
+        matchEndHandled = true
+
+        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+        turnInfoText.removeCallbacks(returnToLobbyRunnable)
+
+        turnInfoText.text = when {
+            matchState.isDraw -> {
+                "Match Draw!"
+            }
+
+            matchState.matchWinner == localPlayer -> {
+                "You Win!"
+            }
+
+            else -> {
+                "You Lose!"
+            }
+        }
+
+        turnInfoText.visibility = View.VISIBLE
+
+        turnInfoText.postDelayed(
+            returnToLobbyRunnable,
+            3_000L
+        )
+    }
+
     override fun onDestroy() {
         turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+        turnInfoText.removeCallbacks(returnToLobbyRunnable)
+
         gameController.setOnStateChangedListener(null)
 
         super.onDestroy()

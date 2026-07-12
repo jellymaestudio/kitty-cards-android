@@ -3,6 +3,7 @@ package kittycards.kittycardsandroid.logic;
 import kittycards.kittycardsandroid.model.Board;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.Match;
+import kittycards.kittycardsandroid.model.MatchStatus;
 import kittycards.kittycardsandroid.model.Player;
 
 /**
@@ -59,6 +60,10 @@ public class MoveValidator {
      * @throws NullPointerException if the player is null
      */
     public boolean canPlayCard(Player player, int row, int column) {
+        if (match.getMatchStatus() != MatchStatus.RUNNING) {
+            return false;
+        }
+
         Board board = match.getGameState().getBoard();
 
         if(!isPlayersTurn(player)) {
@@ -88,7 +93,11 @@ public class MoveValidator {
      * @throws NullPointerException if the player is null
      */
     public boolean canDrawCard(Player player) {
-        if(!isPlayersTurn(player)) {
+        if (match.getMatchStatus() != MatchStatus.RUNNING) {
+            return false;
+        }
+
+        if (!isPlayersTurn(player)) {
             return false;
         }
 
@@ -107,10 +116,15 @@ public class MoveValidator {
      * @throws NullPointerException if the card is null
      */
     public boolean canSelectCard(Player player, Card card) {
-        if(player != match.getPlayerOne() && player != match.getPlayerTwo()) {
+        if (match.getMatchStatus() != MatchStatus.RUNNING) {
             return false;
         }
-        if(card == null) {
+
+        if (player != match.getPlayerOne() && player != match.getPlayerTwo()) {
+            return false;
+        }
+
+        if (card == null) {
             throw new NullPointerException("card cannot be null");
         }
 
