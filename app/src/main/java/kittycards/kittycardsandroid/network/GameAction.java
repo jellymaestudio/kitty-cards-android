@@ -155,6 +155,7 @@ public record GameAction(ActionType type, Card card, GameColor boardColor, int b
         START_MATCH,
         GUEST_ACCEPTED,
         ROOM_CLOSED,
-        MATCH_READY
+        MATCH_READY,
+        MATCH_ABORTED
     }
 }

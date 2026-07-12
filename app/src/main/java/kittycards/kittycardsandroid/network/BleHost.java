@@ -172,13 +172,24 @@ public class BleHost {
                             guestListener.onGuestListUpdated(new ArrayList<>(connectedGuests));
                         }
                     }
-                    if (selectedGuestDevice != null && selectedGuestDevice.getAddress().equals(device.getAddress())) {
-                        emitEvent(WARNING, "Active game partner disconnected: " + device.getAddress()); // <-- NEU: Aktiver Partner weg
+                    if (
+                            selectedGuestDevice != null
+                                    && selectedGuestDevice
+                                    .getAddress()
+                                    .equals(device.getAddress())
+                    ) {
+                        emitEvent(
+                                WARNING,
+                                "Active game partner disconnected: "
+                                        + device.getAddress()
+                        );
+
                         selectedGuestDevice = null;
                         outgoingQueue.clear();
                         notificationInProgress = false;
                         disconnectAfterQueueIsEmpty = false;
-                        // TODO: Inform GameController/UI that the active game partner lost connection
+
+                        networkManager.notifyGamePartnerDisconnected();
                     }
                 }
             });

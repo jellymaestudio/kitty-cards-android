@@ -44,6 +44,7 @@ public class GameController implements IGameController {
     private MoveValidator moveValidator;
     private INetworkManager networkManager;
     private Runnable onStateChangedListener;
+    private Runnable onMatchAbortedListener;
     private static final int STARTING_PLAYER_INITIAL_CARDS = 2;
     private static final int SECOND_PLAYER_INITIAL_CARDS = 3;
     private boolean initialRoundSetupReceived;
@@ -117,6 +118,10 @@ public class GameController implements IGameController {
     @Override
     public void setOnStateChangedListener(Runnable listener) {
         this.onStateChangedListener = listener;
+    }
+
+    public void setOnMatchAbortedListener(Runnable listener) {
+        this.onMatchAbortedListener = listener;
     }
 
     /**
@@ -329,6 +334,7 @@ public class GameController implements IGameController {
         initialRoundSetupReceived = false;
 
         onStateChangedListener = null;
+        onMatchAbortedListener = null;
         networkManager = null;
     }
 
@@ -384,6 +390,12 @@ public class GameController implements IGameController {
 
             case MATCH_FINISHED:
                 match.finishMatch();
+                break;
+
+            case MATCH_ABORTED:
+                if (onMatchAbortedListener != null) {
+                    onMatchAbortedListener.run();
+                }
                 break;
         }
 
