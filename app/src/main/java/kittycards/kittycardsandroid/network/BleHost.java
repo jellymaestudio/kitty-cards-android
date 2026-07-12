@@ -537,6 +537,42 @@ public class BleHost {
     }
 
     /**
+     * Stops advertising the hosted room while keeping the active guest
+     * connection and GATT server alive.
+     *
+     * <p>This is used when the match starts. The room should no longer
+     * appear in guest scan results, but the established Bluetooth
+     * connection must remain available for gameplay.</p>
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    public void stopRoomDiscovery() {
+        networkManager.handler.post(() -> {
+            if (advertiser == null) {
+                emitEvent(
+                        WARNING,
+                        "Room discovery is already stopped"
+                );
+                return;
+            }
+
+            try {
+                advertiser.stopAdvertising(advertiseCallback);
+                emitEvent(
+                        INFO,
+                        "Room discovery stopped"
+                );
+            } catch (IllegalStateException exception) {
+                emitEvent(
+                        WARNING,
+                        "Room discovery could not be stopped cleanly"
+                );
+            } finally {
+                advertiser = null;
+            }
+        });
+    }
+
+    /**
      * Closes the hosted room.
      *
      * <p>If an active guest is selected, the guest is informed through a

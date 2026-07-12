@@ -100,6 +100,15 @@ public class GameController implements IGameController {
         return match.getOtherPlayer(localPlayer);
     }
 
+    /**
+     * Returns the player controlled by the local device.
+     *
+     * @return the local player
+     */
+    public Player getLocalPlayer() {
+        return localPlayer;
+    }
+
 
     @Override
     public void setOnStateChangedListener(Runnable listener) {

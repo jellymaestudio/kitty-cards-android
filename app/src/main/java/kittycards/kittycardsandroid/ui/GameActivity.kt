@@ -1,12 +1,14 @@
 package kittycards.kittycardsandroid.ui
 
 import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
 import android.widget.GridLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -15,7 +17,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.ImageViewCompat
 import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Card
+import kittycards.kittycardsandroid.model.Field
 import kittycards.kittycardsandroid.model.GameColor
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 
@@ -28,13 +32,11 @@ class GameActivity : AppCompatActivity() {
     private lateinit var opponentScoreText: TextView
     private lateinit var playerScoreText: TextView
     private lateinit var turnInfoText: TextView
+    private lateinit var opponentHandScrollView: HorizontalScrollView
+    private lateinit var playerHandScrollView: HorizontalScrollView
 
-
-    private data class TestPlacedCard(
-        val card: Card,
-        val ownerIsHost: Boolean,
-        val displayedScore: Int
-    )
+    private var lastCurrentPlayerId: Int? = null
+    private lateinit var gameController: GameController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +46,16 @@ class GameActivity : AppCompatActivity() {
 
         bindViews()
         applyWindowInsets()
-        renderTestScreen()
+
+        gameController = GameController.getInstance()
+
+        gameController.setOnStateChangedListener {
+            runOnUiThread {
+                renderGameState()
+            }
+        }
+
+        renderGameState()
     }
 
     private fun bindViews() {
@@ -55,6 +66,8 @@ class GameActivity : AppCompatActivity() {
         opponentScoreText = findViewById(R.id.opponentScoreText)
         playerScoreText = findViewById(R.id.playerScoreText)
         turnInfoText = findViewById(R.id.turnInfoText)
+        opponentHandScrollView = findViewById(R.id.opponentHandScrollView)
+        playerHandScrollView = findViewById(R.id.playerHandScrollView)
     }
 
     private fun applyWindowInsets() {
@@ -72,42 +85,78 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderTestScreen() {
-        renderOpponentHand(cardCount = 4)
+    private fun renderGameState() {
+        val match = gameController.match ?: return
+        val localPlayer = gameController.localPlayer ?: return
+        val remotePlayer = gameController.remotePlayer
+        val gameState = match.gameState
+
+        val isLocalPlayersTurn =
+            gameState.currentPlayer == localPlayer
+
+        renderOpponentHand(
+            cardCount = remotePlayer.handCardCount,
+            isActivePlayer = !isLocalPlayersTurn
+        )
+
         renderPlayerHand(
-            listOf(
-                Card(GameColor.YELLOW, 4),
-                Card(GameColor.GREEN, 6),
-                Card(GameColor.GREEN, 3),
-                Card(GameColor.CYAN, 5),
-                Card(GameColor.PURPLE, 1)
-            )
+            cards = localPlayer.handCards,
+            selectedCard = localPlayer.selectedCard,
+            isActivePlayer = isLocalPlayersTurn
+        )
+
+        updateHandBoxSizes(isLocalPlayersTurn)
+        updateTurnMessage(
+            currentPlayerId = gameState.currentPlayer.id,
+            isLocalPlayersTurn = isLocalPlayersTurn
         )
 
         renderRoundResults()
         renderBoard()
 
-        opponentScoreText.text = "0"
-        playerScoreText.text = "13"
-        turnInfoText.visibility = View.GONE
+        opponentScoreText.text = remotePlayer.score.toString()
+        playerScoreText.text = localPlayer.score.toString()
+
+        playerScoreText.setBackgroundColor(
+            getLocalPlayerColor()
+        )
+
+        opponentScoreText.setBackgroundColor(
+            getRemotePlayerColor()
+        )
     }
 
-    private fun renderOpponentHand(cardCount: Int) {
+    private fun renderOpponentHand(
+        cardCount: Int,
+        isActivePlayer: Boolean
+    ) {
         opponentHandContainer.removeAllViews()
 
         repeat(cardCount) {
-            opponentHandContainer.addView(createHiddenCardView())
+            opponentHandContainer.addView(
+                createHiddenCardView(isActivePlayer)
+            )
         }
     }
 
-    private fun renderPlayerHand(cards: List<Card>) {
+    private fun renderPlayerHand(
+        cards: List<Card>,
+        selectedCard: Card?,
+        isActivePlayer: Boolean
+    ) {
         playerHandContainer.removeAllViews()
 
         cards.sortedWith(
             compareBy<Card> { colorSortValue(it.color) }
                 .thenByDescending { it.value }
         ).forEach { card ->
-            playerHandContainer.addView(createVisibleCardView(card))
+            playerHandContainer.addView(
+                createVisibleCardView(
+                    card = card,
+                    isSelected = card == selectedCard,
+                    isActivePlayer = isActivePlayer
+                )
+            )
         }
     }
 
@@ -141,78 +190,112 @@ class GameActivity : AppCompatActivity() {
     private fun renderBoard() {
         boardContainer.removeAllViews()
 
-        val fieldColors = listOf(
-            GameColor.GREY, GameColor.GREY, GameColor.PURPLE,
-            GameColor.CYAN, GameColor.GREY, GameColor.GREEN,
-            GameColor.GREY, GameColor.GREEN, GameColor.GREY
-        )
+        val board = gameController.match
+            ?.gameState
+            ?.board
+            ?: return
 
         for (row in 0..2) {
             for (column in 0..2) {
-                val index = row * 3 + column
-
                 if (row == 1 && column == 1) {
-                    boardContainer.addView(createDrawPileView())
-                } else {
                     boardContainer.addView(
-                        createBoardFieldView(
-                            fieldColor = fieldColors[index],
-                            placedCard = testPlacedCard(row, column)
-                        )
+                        createDrawPileView()
+                    )
+                } else {
+                    val field = board.getField(row, column)
+
+                    boardContainer.addView(
+                        createBoardFieldView(field)
                     )
                 }
             }
         }
     }
 
-    private fun testPlacedCard(row: Int, column: Int): TestPlacedCard? {
-        return when {
-            row == 0 && column == 0 -> TestPlacedCard(
-                card = Card(GameColor.PURPLE, 1),
-                ownerIsHost = true,
-                displayedScore = 1
-            )
+    private fun createHiddenCardView(
+        isActivePlayer: Boolean
+    ): View {
+        val cardHeight =
+            if (isActivePlayer) {
+                80.dp()
+            } else {
+                68.dp()
+            }
 
-            row == 1 && column == 2 -> TestPlacedCard(
-                card = Card(GameColor.CYAN, 1),
-                ownerIsHost = false,
-                displayedScore = 0
-            )
-
-            row == 2 && column == 1 -> TestPlacedCard(
-                card = Card(GameColor.GREEN, 6),
-                ownerIsHost = true,
-                displayedScore = 12
-            )
-
-            else -> null
-        }
-    }
-
-    private fun createHiddenCardView(): View {
         return View(this).apply {
-            setBackgroundColor(getColor(R.color.kc_guest))
+            setBackgroundColor(getRemotePlayerColor())
+
             layoutParams = LinearLayout.LayoutParams(
                 48.dp(),
-                80.dp()
+                cardHeight
             ).apply {
                 marginEnd = 8.dp()
             }
         }
     }
 
-    private fun createVisibleCardView(card: Card): View {
+    private fun createVisibleCardView(
+        card: Card,
+        isSelected: Boolean,
+        isActivePlayer: Boolean
+    ): View {
+        val cardHeight =
+            if (isActivePlayer) {
+                88.dp()
+            } else {
+                76.dp()
+            }
+
+        val cardBackground = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+
+            setColor(
+                GameColorMapper.toAndroidColor(card.color)
+            )
+
+            if (isSelected) {
+                setStroke(
+                    3.dp(),
+                    getColor(android.R.color.white)
+                )
+            }
+        }
+
         val cardView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(GameColorMapper.toAndroidColor(card.color))
-            setPadding(4.dp(), 6.dp(), 4.dp(), 4.dp())
+            background = cardBackground
+
+            setPadding(
+                4.dp(),
+                6.dp(),
+                4.dp(),
+                4.dp()
+            )
 
             layoutParams = LinearLayout.LayoutParams(
                 56.dp(),
-                88.dp()
+                cardHeight
             ).apply {
                 marginEnd = 8.dp()
+            }
+
+            isClickable = true
+            isFocusable = true
+
+            setOnClickListener {
+                val localPlayer =
+                    gameController.localPlayer
+                        ?: return@setOnClickListener
+
+                if (localPlayer.selectedCard == card) {
+                    gameController.unselectCard(localPlayer)
+                } else {
+                    gameController.selectCard(
+                        localPlayer,
+                        card
+                    )
+                }
             }
         }
 
@@ -247,13 +330,10 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun createBoardFieldView(
-        fieldColor: GameColor,
-        placedCard: TestPlacedCard?
+        field: Field
     ): View {
-        /*
-         * Ebene 1:
-         * Dünner schwarzer Rand, der die einzelnen Felder voneinander trennt.
-         */
+        val placedCard = field.card
+
         val blackBorder = FrameLayout(this).apply {
             setBackgroundColor(getColor(android.R.color.black))
             setPadding(1.dp(), 1.dp(), 1.dp(), 1.dp())
@@ -264,13 +344,9 @@ class GameActivity : AppCompatActivity() {
             }
         }
 
-        /*
-         * Ebene 2:
-         * Der farbige Rahmen des Feldes.
-         */
         val fieldColorFrame = FrameLayout(this).apply {
             setBackgroundColor(
-                GameColorMapper.toAndroidColor(fieldColor)
+                GameColorMapper.toAndroidColor(field.color)
             )
             setPadding(7.dp(), 7.dp(), 7.dp(), 7.dp())
 
@@ -280,20 +356,13 @@ class GameActivity : AppCompatActivity() {
             )
         }
 
-        /*
-         * Ebene 3:
-         * Die eigentliche Feldfläche.
-         *
-         * Leer       -> weiß
-         * Karte liegt -> Kartenfarbe
-         */
         val cardArea = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
 
             setBackgroundColor(
-                placedCard?.let {
-                    GameColorMapper.toAndroidColor(it.card.color)
+                placedCard?.let { card ->
+                    GameColorMapper.toAndroidColor(card.color)
                 } ?: getColor(android.R.color.white)
             )
 
@@ -305,7 +374,7 @@ class GameActivity : AppCompatActivity() {
 
         if (placedCard != null) {
             val scoreText = TextView(this).apply {
-                text = placedCard.displayedScore.toString()
+                text = field.displayedScore.toString()
                 textSize = 17f
                 gravity = Gravity.CENTER
                 setTextColor(getColor(android.R.color.black))
@@ -330,11 +399,16 @@ class GameActivity : AppCompatActivity() {
                 }
             }
 
-            val ownerColor = if (placedCard.ownerIsHost) {
-                getColor(R.color.kc_host)
-            } else {
-                getColor(R.color.kc_guest)
-            }
+            /*
+             * Player 0 is always the host.
+             * Player 1 is always the guest.
+             */
+            val ownerColor =
+                if (field.cardOwnerId == 0) {
+                    getColor(R.color.kc_host)
+                } else {
+                    getColor(R.color.kc_guest)
+                }
 
             val kittyFill = ImageView(this).apply {
                 setImageResource(R.drawable.kitty_fill)
@@ -448,6 +522,74 @@ class GameActivity : AppCompatActivity() {
         return blackBorder
     }
 
+    private fun updateHandBoxSizes(
+        isLocalPlayersTurn: Boolean
+    ) {
+        setHandBoxHeight(
+            scrollView = playerHandScrollView,
+            isActivePlayer = isLocalPlayersTurn
+        )
+
+        setHandBoxHeight(
+            scrollView = opponentHandScrollView,
+            isActivePlayer = !isLocalPlayersTurn
+        )
+    }
+
+    private fun setHandBoxHeight(
+        scrollView: HorizontalScrollView,
+        isActivePlayer: Boolean
+    ) {
+        val targetHeight =
+            if (isActivePlayer) {
+                104.dp()
+            } else {
+                92.dp()
+            }
+
+        if (scrollView.layoutParams.height == targetHeight) {
+            return
+        }
+
+        scrollView.layoutParams =
+            scrollView.layoutParams.apply {
+                height = targetHeight
+            }
+
+        scrollView.requestLayout()
+    }
+
+    private fun updateTurnMessage(
+        currentPlayerId: Int,
+        isLocalPlayersTurn: Boolean
+    ) {
+        /*
+         * Nur auf einen tatsächlichen Zugwechsel reagieren.
+         * Dadurch startet die Einblendung nicht bei jedem Neurendern erneut.
+         */
+        if (lastCurrentPlayerId == currentPlayerId) {
+            return
+        }
+
+        lastCurrentPlayerId = currentPlayerId
+        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+
+        if (isLocalPlayersTurn) {
+            turnInfoText.visibility = View.VISIBLE
+
+            turnInfoText.postDelayed(
+                hideTurnInfoRunnable,
+                1_500L
+            )
+        } else {
+            turnInfoText.visibility = View.GONE
+        }
+    }
+
+    private val hideTurnInfoRunnable = Runnable {
+        turnInfoText.visibility = View.GONE
+    }
+
     private fun colorSortValue(color: GameColor): Int {
         return when (color) {
             GameColor.YELLOW -> 0
@@ -455,6 +597,29 @@ class GameActivity : AppCompatActivity() {
             GameColor.CYAN -> 2
             GameColor.PURPLE -> 3
             GameColor.GREY -> 4
+        }
+    }
+
+    override fun onDestroy() {
+        turnInfoText.removeCallbacks(hideTurnInfoRunnable)
+        gameController.setOnStateChangedListener(null)
+
+        super.onDestroy()
+    }
+
+    private fun getLocalPlayerColor(): Int {
+        return if (gameController.localPlayer?.id == 0) {
+            getColor(R.color.kc_host)
+        } else {
+            getColor(R.color.kc_guest)
+        }
+    }
+
+    private fun getRemotePlayerColor(): Int {
+        return if (gameController.localPlayer?.id == 0) {
+            getColor(R.color.kc_guest)
+        } else {
+            getColor(R.color.kc_host)
         }
     }
 
