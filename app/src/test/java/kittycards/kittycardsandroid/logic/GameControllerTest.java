@@ -2,6 +2,7 @@ package kittycards.kittycardsandroid.logic;
 
 import org.junit.Test;
 
+import kittycards.kittycardsandroid.components.FakeNetworkManager;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.GameColor;
 import kittycards.kittycardsandroid.model.MatchStatus;
@@ -14,26 +15,22 @@ import java.util.List;
 
 public class GameControllerTest {
 
+    private GameController createController() {
+        return new GameController(new FakeNetworkManager());
+    }
+
     // --- Construction and Initialization Tests ---
 
     @Test
-    public void getInstanceShouldReturnGameControllerInstance() {
-        GameController gameController = GameController.getInstance();
+    public void constructionShouldReturnGameControllerInstance() {
+        GameController gameController = createController();
 
         assertNotNull(gameController);
     }
 
     @Test
-    public void getInstanceShouldReturnSameInstance() {
-        GameController firstInstance = GameController.getInstance();
-        GameController secondInstance = GameController.getInstance();
-
-        assertSame(firstInstance, secondInstance);
-    }
-
-    @Test
     public void startMatchShouldCreateMatch() {
-        GameController gameController = GameController.getInstance();
+        GameController gameController = createController();
         Player playerOne = new Player(1, "Player One");
         Player playerTwo = new Player(2, "Player Two");
 
@@ -44,7 +41,7 @@ public class GameControllerTest {
 
     @Test
     public void startMatchShouldSetPlayerOne() {
-        GameController gameController = GameController.getInstance();
+        GameController gameController = createController();
         Player playerOne = new Player(1, "Player One");
         Player playerTwo = new Player(2, "Player Two");
 
@@ -55,7 +52,7 @@ public class GameControllerTest {
 
     @Test
     public void startMatchShouldSetPlayerTwo() {
-        GameController gameController = GameController.getInstance();
+        GameController gameController = createController();
         Player playerOne = new Player(1, "Player One");
         Player playerTwo = new Player(2, "Player Two");
 
@@ -66,7 +63,7 @@ public class GameControllerTest {
 
     @Test
     public void startMatchShouldSetMatchStatusToRunning() {
-        GameController gameController = GameController.getInstance();
+        GameController gameController = createController();
         Player playerOne = new Player(1, "Player One");
         Player playerTwo = new Player(2, "Player Two");
 
@@ -314,7 +311,7 @@ public class GameControllerTest {
     // --- Helper Methods ---
 
     private GameController createStartedController() {
-        GameController gameController = GameController.getInstance();
+        GameController gameController = createController();
 
         Player playerOne = new Player(1, "Player One");
         Player playerTwo = new Player(2, "Player Two");

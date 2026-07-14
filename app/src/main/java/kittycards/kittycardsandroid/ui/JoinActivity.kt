@@ -20,19 +20,24 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kittycards.kittycardsandroid.R
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kittycards.kittycardsandroid.components.IGameController
+import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Player
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
-import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.network.event.NetworkEvent
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 import kittycards.kittycardsandroid.network.OnRoomConnectionListener
 import kittycards.kittycardsandroid.network.Role
 
+@AndroidEntryPoint
 class JoinActivity : AppCompatActivity() {
 
-    private lateinit var networkManager: NetworkManager
+    @Inject lateinit var networkManager: INetworkManager
+    @Inject lateinit var gameController: GameController
 
     private val availableRooms = mutableListOf<NetworkDevice>()
 
@@ -84,7 +89,7 @@ class JoinActivity : AppCompatActivity() {
         supportActionBar?.hide()
         setContentView(R.layout.activity_join)
 
-        networkManager = NetworkManager.getInstance(applicationContext)
+        // networkManager is injected
 
         bindViews()
         applyWindowInsets()
@@ -350,7 +355,7 @@ class JoinActivity : AppCompatActivity() {
             "Guest"
         )
 
-        val gameController = GameController.getInstance()
+        // gameController is injected
 
         gameController.setNetworkManager(networkManager)
         gameController.setNetworkRole(Role.GUEST)

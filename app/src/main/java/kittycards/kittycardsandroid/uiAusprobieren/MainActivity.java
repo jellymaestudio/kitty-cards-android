@@ -12,18 +12,22 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.inject.Inject;
+
+import dagger.hilt.android.AndroidEntryPoint;
 import kittycards.kittycardsandroid.R;
 import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
-import kittycards.kittycardsandroid.network.NetworkManager;
 
+@AndroidEntryPoint
 public class MainActivity extends AppCompatActivity {
 
     private TextView statusTextView;
     private TextView dataLogTextView;
     private TextView errorTextView;
-    private INetworkManager networkManager;
+    @Inject
+    INetworkManager networkManager;
 
 
     // Listen für die Bluetooth-Geräte im Umkreis
@@ -48,8 +52,6 @@ public class MainActivity extends AppCompatActivity {
         }, 101);
 
         // Ab hier folgt dein restlicher UI- und NetworkManager-Code...
-        NetworkManager.getInstance(this);
-        networkManager = NetworkManager.getInstance();
 
         statusTextView = findViewById(R.id.tv_status);
         dataLogTextView = findViewById(R.id.tv_data_log);

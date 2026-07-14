@@ -23,6 +23,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.ImageViewCompat
 import kittycards.kittycardsandroid.R
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kittycards.kittycardsandroid.components.IGameController
+import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.logic.GameSessionController
 import kittycards.kittycardsandroid.model.Card
@@ -34,6 +38,7 @@ import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 import kittycards.kittycardsandroid.network.OnGameConnectionListener
 
+@AndroidEntryPoint
 class GameActivity : AppCompatActivity() {
 
     private lateinit var opponentHandContainer: LinearLayout
@@ -77,8 +82,9 @@ class GameActivity : AppCompatActivity() {
                 }
             }
         }
-    private lateinit var gameController: GameController
-    private lateinit var gameSessionController: GameSessionController
+    @Inject lateinit var gameController: GameController
+    @Inject lateinit var gameSessionController: GameSessionController
+    @Inject lateinit var networkManager: NetworkManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,12 +95,9 @@ class GameActivity : AppCompatActivity() {
         bindViews()
         applyWindowInsets()
 
-        gameController = GameController.getInstance()
+        // gameController is injected
 
-        gameSessionController = GameSessionController(
-            gameController = gameController,
-            networkManager = NetworkManager.getInstance()
-        )
+        // gameSessionController is injected
 
         setupSessionControllerCallbacks()
 
@@ -812,7 +815,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun setupGameConnectionListener() {
-        NetworkManager.getInstance()
+        networkManager
             .setGameConnectionListener(
                 object : OnGameConnectionListener {
                     override fun onGamePartnerDisconnected() {
@@ -883,7 +886,7 @@ class GameActivity : AppCompatActivity() {
     override fun onDestroy() {
         turnInfoText.removeCallbacks(hideTurnInfoRunnable)
 
-        NetworkManager.getInstance()
+        networkManager
             .setGameConnectionListener(null)
 
         gameController.setOnStateChangedListener(null)

@@ -7,7 +7,9 @@ import androidx.annotation.RequiresPermission;
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
+import kittycards.kittycardsandroid.network.OnGameConnectionListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
+import kittycards.kittycardsandroid.network.OnRoomConnectionListener;
 import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
@@ -76,6 +78,15 @@ public interface INetworkManager {
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
     void disconnect();
 
+    @RequiresPermission(allOf = {
+            Manifest.permission.BLUETOOTH_ADVERTISE,
+            Manifest.permission.BLUETOOTH_CONNECT
+    })
+    void closeHostedRoom();
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    void stopRoomDiscovery();
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     void sendGameChange(GameAction action);
 
@@ -98,6 +109,10 @@ public interface INetworkManager {
      * @param listener listener receiving NetworkEvent updates on main thread
      */
     void setNetworkEventListener(NetworkEventListener listener);
+
+    void setRoomConnectionListener(OnRoomConnectionListener listener);
+
+    void setGameConnectionListener(OnGameConnectionListener listener);
 
     /**
      * Returns the current role of this device in the network connection (Host, Guest, or Not Connected).

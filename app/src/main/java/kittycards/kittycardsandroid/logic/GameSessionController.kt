@@ -6,6 +6,8 @@ import android.os.Looper
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkManager
 
+import javax.inject.Inject
+
 /**
  * Coordinates the lifecycle of an active network game session.
  *
@@ -16,7 +18,7 @@ import kittycards.kittycardsandroid.network.NetworkManager
  *
  * @author JellyMae
  */
-class GameSessionController(
+class GameSessionController @Inject constructor(
     private val gameController: GameController,
     private val networkManager: NetworkManager
 ) {
