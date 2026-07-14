@@ -16,6 +16,8 @@ kotlin = "2.2.10"
 mockitoCore = "5.23.0"
 mockitoJunitJupiter = "5.23.0"
 robolectric = "4.16.1"
+hilt = "2.60.1"
+ksp = "2.2.10-2.0.2"
 
 [libraries]
 androidx-core = { module = "androidx.test:core", version.ref = "core" }
@@ -41,8 +43,13 @@ mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore
 mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockitoJunitJupiter" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
+hilt-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-junit = { id = "de.mannodermaus.android-junit", version.ref = "androidJunit" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
