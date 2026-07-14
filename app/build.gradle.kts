@@ -67,6 +67,8 @@ dependencies {
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.junit.jupiter)
     testImplementation(libs.robolectric)
+    testImplementation(libs.hilt.testing)
+    kspTest(libs.hilt.compiler)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
 

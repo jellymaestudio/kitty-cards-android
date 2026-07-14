@@ -9,12 +9,14 @@ import java.util.concurrent.TimeUnit;
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
+import kittycards.kittycardsandroid.network.OnGameConnectionListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
+import kittycards.kittycardsandroid.network.OnRoomConnectionListener;
 import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /*only for testing*/
-class FakeNetworkManager implements INetworkManager {
+public class FakeNetworkManager implements INetworkManager {
 
     private final ArrayList<NetworkDevice> discoveredDevices = new ArrayList<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -77,6 +79,26 @@ class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void setNetworkEventListener(NetworkEventListener listener) {
+
+    }
+
+    @Override
+    public void setRoomConnectionListener(OnRoomConnectionListener listener) {
+
+    }
+
+    @Override
+    public void setGameConnectionListener(OnGameConnectionListener listener) {
+
+    }
+
+    @Override
+    public void closeHostedRoom() {
+
+    }
+
+    @Override
+    public void stopRoomDiscovery() {
 
     }
 

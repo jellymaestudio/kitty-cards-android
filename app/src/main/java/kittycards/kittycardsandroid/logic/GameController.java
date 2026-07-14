@@ -5,6 +5,9 @@ import android.annotation.SuppressLint;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 import kittycards.kittycardsandroid.components.IGameController;
 import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.model.Board;
@@ -30,11 +33,10 @@ import kittycards.kittycardsandroid.network.Role;
  *
  * @author JellyMae
  */
+@Singleton
 public class GameController implements IGameController {
 
     // --- Fields ---
-
-    private static GameController INSTANCE;
 
     private Match match;
     private Player localPlayer;
@@ -54,25 +56,9 @@ public class GameController implements IGameController {
 
     // --- Constructor ---
 
-    private GameController() {
-
-    }
-
-
-    // --- Singleton ---
-
-    /**
-     * Returns the singleton instance of the GameController.
-     * Creates the instance if it does not already exist.
-     *
-     * @return the GameController instance
-     */
-    public static GameController getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new GameController();
-        }
-
-        return INSTANCE;
+    @Inject
+    public GameController(INetworkManager networkManager) {
+        this.networkManager = networkManager;
     }
 
 

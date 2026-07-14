@@ -1,5 +1,7 @@
 package kittycards.kittycardsandroid.network;
 
+import javax.inject.Inject;
+
 import kittycards.kittycardsandroid.components.IProtocolEngine;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.GameColor;
@@ -9,6 +11,11 @@ import kittycards.kittycardsandroid.model.GameColor;
  * @author red_concrete
  */
 public class ProtocolEngine implements IProtocolEngine {
+
+    @Inject
+    public ProtocolEngine() {
+    }
+
     @Override
     public byte[] encodeGameAction(GameAction action) {
         if (action == null) throw new NullPointerException("action must not be null");

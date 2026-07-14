@@ -20,18 +20,23 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kittycards.kittycardsandroid.R
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kittycards.kittycardsandroid.components.IGameController
+import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Player
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
-import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.network.Role
 import kittycards.kittycardsandroid.network.event.NetworkEvent
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 
+@AndroidEntryPoint
 class HostActivity : AppCompatActivity() {
 
-    private lateinit var networkManager: NetworkManager
+    @Inject lateinit var networkManager: INetworkManager
+    @Inject lateinit var gameController: GameController
 
     private val availableGuests = mutableListOf<NetworkDevice>()
     private var selectedGuest: NetworkDevice? = null
@@ -75,7 +80,7 @@ class HostActivity : AppCompatActivity() {
         supportActionBar?.hide()
         setContentView(R.layout.activity_host)
 
-        networkManager = NetworkManager.getInstance(applicationContext)
+        // networkManager is injected
 
         bindViews()
         applyWindowInsets()
@@ -236,7 +241,7 @@ class HostActivity : AppCompatActivity() {
             "Guest"
         )
 
-        val gameController = GameController.getInstance()
+        // gameController is injected
 
         gameController.setNetworkManager(networkManager)
         gameController.setNetworkRole(Role.HOST)
