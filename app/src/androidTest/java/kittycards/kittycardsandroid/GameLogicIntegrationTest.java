@@ -16,6 +16,7 @@ import javax.inject.Inject;
 import dagger.hilt.android.testing.HiltAndroidRule;
 import dagger.hilt.android.testing.HiltAndroidTest;
 import kittycards.kittycardsandroid.components.IGameController;
+import kittycards.kittycardsandroid.logic.GameController;
 import kittycards.kittycardsandroid.model.Player;
 import kittycards.kittycardsandroid.model.MatchStatus;
 
@@ -42,8 +43,9 @@ public class GameLogicIntegrationTest {
         gameController.startMatch(p1, p2);
 
         assertNotNull(gameController);
-        // Assuming GameController has a way to get the match via IGameController 
-        // or we cast it for testing (though ideally IGameController should have it)
-        // Let's check IGameController again.
+        if (gameController instanceof GameController gc) {
+            assertNotNull(gc.getMatch());
+            assertEquals(MatchStatus.RUNNING, gc.getMatch().getMatchStatus());
+        }
     }
 }
