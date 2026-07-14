@@ -59,7 +59,7 @@ public class MoveValidator {
      * @return true if the player can play a card on the given field, false otherwise
      * @throws NullPointerException if the player is null
      */
-    public boolean canPlayCard(Player player, int row, int column) {
+        public boolean canPlayCard(Player player, int row, int column) {
         if (match.getMatchStatus() != MatchStatus.RUNNING) {
             return false;
         }
@@ -129,5 +129,25 @@ public class MoveValidator {
         }
 
         return player.hasCard(card);
+    }
+
+    /**
+     * Checks whether the given player can unselect their currently selected card.
+     *
+     * @param player the player
+     * @return true if the player may unselect a card
+     * @throws NullPointerException if the player is null
+     */
+    public boolean canUnselectCard(Player player) {
+        if (player == null) {
+            throw new NullPointerException("player cannot be null");
+        }
+
+        if (match.getMatchStatus() != MatchStatus.RUNNING) {
+            return false;
+        }
+
+        return player == match.getPlayerOne()
+                || player == match.getPlayerTwo();
     }
 }

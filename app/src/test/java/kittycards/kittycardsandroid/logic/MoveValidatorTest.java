@@ -1,208 +1,671 @@
 package kittycards.kittycardsandroid.logic;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
 
 import kittycards.kittycardsandroid.model.Card;
+import kittycards.kittycardsandroid.model.Field;
 import kittycards.kittycardsandroid.model.GameColor;
 import kittycards.kittycardsandroid.model.Match;
+import kittycards.kittycardsandroid.model.MatchStatus;
 import kittycards.kittycardsandroid.model.Player;
 
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
-public class MoveValidatorTest {
+class MoveValidatorTest {
+
+    private static final List<GameColor> FIELD_COLORS = List.of(
+            GameColor.YELLOW,
+            GameColor.GREY,
+            GameColor.GREEN,
+            GameColor.CYAN,
+            GameColor.GREY,
+            GameColor.PURPLE,
+            GameColor.GREY,
+            GameColor.GREY
+    );
+
+    private Player playerOne;
+    private Player playerTwo;
+    private Player foreignPlayer;
+
+    private Match match;
+    private MoveValidator validator;
+
+    private Card yellowCard;
+    private Card greenCard;
+
+    @BeforeEach
+    void setUp() {
+        playerOne = new Player(1, "Player One");
+        playerTwo = new Player(2, "Player Two");
+        foreignPlayer = new Player(3, "Foreign Player");
+
+        match = new Match(playerOne, playerTwo);
+        match.initializeCurrentRound(FIELD_COLORS, playerOne);
+        match.setMatchStatus(MatchStatus.RUNNING);
+
+        validator = new MoveValidator(match);
+
+        yellowCard = new Card(GameColor.YELLOW, 3);
+        greenCard = new Card(GameColor.GREEN, 5);
+    }
+
+    // -------------------------------------------------------------------------
+    // Constructor
+    // -------------------------------------------------------------------------
 
     @Test
-    public void constructorShouldThrowExceptionIfMatchIsNull() {
-        assertThrows(NullPointerException.class, () -> new MoveValidator(null));
+    void constructorAcceptsValidMatch() {
+        assertDoesNotThrow(() -> new MoveValidator(match));
     }
 
     @Test
-    public void isPlayersTurnShouldReturnTrueForCurrentPlayer() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
+    void constructorRejectsNullMatch() {
+        assertThrows(
+                NullPointerException.class,
+                () -> new MoveValidator(null)
+        );
+    }
 
-        assertTrue(validator.isPlayersTurn(match.getGameState().getCurrentPlayer()));
+    // -------------------------------------------------------------------------
+    // isPlayersTurn
+    // -------------------------------------------------------------------------
+
+    @Test
+    void isPlayersTurnReturnsTrueForCurrentPlayer() {
+        assertTrue(validator.isPlayersTurn(playerOne));
     }
 
     @Test
-    public void isPlayersTurnShouldReturnFalseForInactivePlayer() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-
-        Player currentPlayer = match.getGameState().getCurrentPlayer();
-        Player inactivePlayer = match.getOtherPlayer(currentPlayer);
-
-        assertFalse(validator.isPlayersTurn(inactivePlayer));
+    void isPlayersTurnReturnsFalseForOtherMatchPlayer() {
+        assertFalse(validator.isPlayersTurn(playerTwo));
     }
 
     @Test
-    public void isPlayersTurnShouldThrowExceptionIfPlayerIsNull() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-
-        assertThrows(NullPointerException.class, () -> validator.isPlayersTurn(null));
+    void isPlayersTurnReturnsFalseForForeignPlayer() {
+        assertFalse(validator.isPlayersTurn(foreignPlayer));
     }
 
     @Test
-    public void canPlayCardShouldReturnTrueForValidMove() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
-        Card card = new Card(GameColor.PURPLE, 3);
+    void isPlayersTurnReturnsTrueAfterCurrentPlayerChanges() {
+        match.getGameState().setCurrentPlayer(playerTwo);
 
-        player.addCard(card);
-        player.selectCard(card);
-
-        assertTrue(validator.canPlayCard(player, 0, 0));
+        assertTrue(validator.isPlayersTurn(playerTwo));
+        assertFalse(validator.isPlayersTurn(playerOne));
     }
 
     @Test
-    public void canPlayCardShouldReturnFalseIfPlayerIsNotCurrentPlayer() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
+    void isPlayersTurnRejectsNullPlayer() {
+        assertThrows(
+                NullPointerException.class,
+                () -> validator.isPlayersTurn(null)
+        );
+    }
 
-        Player inactivePlayer = match.getOtherPlayer(match.getGameState().getCurrentPlayer());
-        Card card = new Card(GameColor.PURPLE, 3);
+    // -------------------------------------------------------------------------
+    // canPlayCard - valid cases
+    // -------------------------------------------------------------------------
 
-        inactivePlayer.addCard(card);
-        inactivePlayer.selectCard(card);
+    @ParameterizedTest(name = "Current player should be able to play at ({0}, {1})")
+    @CsvSource({
+            "0, 0",
+            "0, 1",
+            "0, 2",
+            "1, 0",
+            "1, 2",
+            "2, 0",
+            "2, 1",
+            "2, 2"
+    })
+    void canPlayCardReturnsTrueForValidPlayableField(int row, int column) {
+        addAndSelectCard(playerOne, yellowCard);
 
-        assertFalse(validator.canPlayCard(inactivePlayer, 0, 0));
+        assertTrue(validator.canPlayCard(playerOne, row, column));
     }
 
     @Test
-    public void canPlayCardShouldReturnFalseIfPositionIsOutsideBoard() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
-        Card card = new Card(GameColor.PURPLE, 3);
+    void canPlayCardReturnsTrueForSecondPlayerWhenItIsTheirTurn() {
+        match.getGameState().setCurrentPlayer(playerTwo);
+        addAndSelectCard(playerTwo, greenCard);
 
-        player.addCard(card);
-        player.selectCard(card);
+        assertTrue(validator.canPlayCard(playerTwo, 0, 0));
+    }
 
-        assertFalse(validator.canPlayCard(player, -1, 0));
-        assertFalse(validator.canPlayCard(player, 3, 0));
-        assertFalse(validator.canPlayCard(player, 0, -1));
-        assertFalse(validator.canPlayCard(player, 0, 3));
+    // -------------------------------------------------------------------------
+    // canPlayCard - invalid match states
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MatchStatus.class,
+            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
+    )
+    void canPlayCardReturnsFalseWhenMatchIsNotRunning(
+            MatchStatus matchStatus
+    ) {
+        addAndSelectCard(playerOne, yellowCard);
+        match.setMatchStatus(matchStatus);
+
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
+    }
+
+    // -------------------------------------------------------------------------
+    // canPlayCard - invalid players
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canPlayCardReturnsFalseWhenItIsNotPlayersTurn() {
+        addAndSelectCard(playerTwo, greenCard);
+
+        assertFalse(validator.canPlayCard(playerTwo, 0, 0));
     }
 
     @Test
-    public void canPlayCardShouldReturnFalseIfPositionIsCenterField() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
-        Card card = new Card(GameColor.PURPLE, 3);
+    void canPlayCardReturnsFalseForForeignPlayer() {
+        addAndSelectCard(foreignPlayer, yellowCard);
 
-        player.addCard(card);
-        player.selectCard(card);
-
-        assertFalse(validator.canPlayCard(player, 1, 1));
-    }
-
-    /*
-    @Test
-    public void canPlayCardShouldReturnFalseIfFieldIsOccupied() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
-        Card selectedCard = new Card(GameColor.PURPLE, 3);
-        Card placedCard = new Card(GameColor.CYAN, 2);
-
-        player.addCard(selectedCard);
-        player.selectCard(selectedCard);
-        match.getGameState().getBoard().getField(0, 0).placeCard(placedCard);
-
-        assertFalse(validator.canPlayCard(player, 0, 0));
-    }*/
-
-    @Test
-    public void canPlayCardShouldReturnFalseIfPlayerHasNoSelectedCard() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
-
-        assertFalse(validator.canPlayCard(player, 0, 0));
+        assertFalse(validator.canPlayCard(foreignPlayer, 0, 0));
     }
 
     @Test
-    public void canDrawCardShouldReturnTrueIfPlayerIsCurrentPlayerAndHandIsNotFull() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
+    void canPlayCardRejectsNullPlayer() {
+        assertThrows(
+                NullPointerException.class,
+                () -> validator.canPlayCard(null, 0, 0)
+        );
+    }
 
-        assertTrue(validator.canDrawCard(player));
+    // -------------------------------------------------------------------------
+    // canPlayCard - invalid positions
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "Position ({0}, {1}) should be rejected")
+    @CsvSource({
+            "-1, 0",
+            "0, -1",
+            "3, 0",
+            "0, 3",
+            "-1, -1",
+            "-1, 3",
+            "3, -1",
+            "3, 3",
+            "-100, 1",
+            "1, 100"
+    })
+    void canPlayCardReturnsFalseForPositionOutsideBoard(
+            int row,
+            int column
+    ) {
+        addAndSelectCard(playerOne, yellowCard);
+
+        assertFalse(validator.canPlayCard(playerOne, row, column));
     }
 
     @Test
-    public void canDrawCardShouldReturnFalseIfPlayerIsNotCurrentPlayer() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player inactivePlayer = match.getOtherPlayer(match.getGameState().getCurrentPlayer());
+    void canPlayCardReturnsFalseForCenterField() {
+        addAndSelectCard(playerOne, yellowCard);
 
-        assertFalse(validator.canDrawCard(inactivePlayer));
+        assertFalse(validator.canPlayCard(playerOne, 1, 1));
+    }
+
+    // -------------------------------------------------------------------------
+    // canPlayCard - field and selection conditions
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canPlayCardReturnsFalseForOccupiedField() {
+        addAndSelectCard(playerOne, yellowCard);
+
+        Player owner = new Player(5, "Owner");
+        Card placedCard = new Card(GameColor.GREEN, 4);
+
+        match.getGameState()
+                .getBoard()
+                .getField(0, 0)
+                .placeCard(placedCard, owner, 4);
+
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
     }
 
     @Test
-    public void canDrawCardShouldReturnFalseIfHandHasTenCards() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getGameState().getCurrentPlayer();
+    void canPlayCardReturnsFalseWhenPlayerHasNoSelectedCard() {
+        playerOne.addCard(yellowCard);
 
-        for (int i = 0; i < 10; i++) {
-            player.addCard(new Card(GameColor.PURPLE, 1));
-        }
-
-        assertFalse(validator.canDrawCard(player));
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
     }
 
     @Test
-    public void canSelectCardShouldReturnTrueIfPlayerOwnsCard() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getPlayerOne();
-        Card card = new Card(GameColor.PURPLE, 3);
-
-        player.addCard(card);
-
-        assertTrue(validator.canSelectCard(player, card));
+    void canPlayCardReturnsFalseWhenPlayersHandIsEmpty() {
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
     }
 
     @Test
-    public void canSelectCardShouldReturnFalseIfPlayerIsNotPartOfMatch() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player otherPlayer = new Player(3, "Other Player");
-        Card card = new Card(GameColor.PURPLE, 3);
+    void canPlayCardUsesSelectedCardState() {
+        playerOne.addCard(yellowCard);
 
-        otherPlayer.addCard(card);
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
 
-        assertFalse(validator.canSelectCard(otherPlayer, card));
+        playerOne.selectCard(yellowCard);
+
+        assertTrue(validator.canPlayCard(playerOne, 0, 0));
+
+        playerOne.unselectCard();
+
+        assertFalse(validator.canPlayCard(playerOne, 0, 0));
+    }
+
+    // -------------------------------------------------------------------------
+    // canPlayCard - no side effects
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canPlayCardDoesNotPlaceSelectedCard() {
+        addAndSelectCard(playerOne, yellowCard);
+
+        Field field = match.getGameState()
+                .getBoard()
+                .getField(0, 0);
+
+        assertTrue(validator.canPlayCard(playerOne, 0, 0));
+
+        assertTrue(field.isEmpty());
     }
 
     @Test
-    public void canSelectCardShouldThrowExceptionIfCardIsNull() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
+    void canPlayCardDoesNotRemoveCardFromHand() {
+        addAndSelectCard(playerOne, yellowCard);
 
-        assertThrows(NullPointerException.class, () ->
-                validator.canSelectCard(match.getPlayerOne(), null)
+        validator.canPlayCard(playerOne, 0, 0);
+
+        assertTrue(playerOne.hasCard(yellowCard));
+    }
+
+    @Test
+    void canPlayCardDoesNotChangeSelectedCard() {
+        addAndSelectCard(playerOne, yellowCard);
+
+        validator.canPlayCard(playerOne, 0, 0);
+
+        assertSame(yellowCard, playerOne.getSelectedCard());
+    }
+
+    @Test
+    void canPlayCardDoesNotChangeCurrentPlayer() {
+        addAndSelectCard(playerOne, yellowCard);
+
+        validator.canPlayCard(playerOne, 0, 0);
+
+        assertSame(
+                playerOne,
+                match.getGameState().getCurrentPlayer()
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // canDrawCard - valid cases
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "Player with {0} cards should be allowed to draw")
+    @ValueSource(ints = {0, 1, 5, 8, 9})
+    void canDrawCardReturnsTrueWhenHandContainsFewerThanTenCards(
+            int cardCount
+    ) {
+        addCards(playerOne, cardCount);
+
+        assertTrue(validator.canDrawCard(playerOne));
+    }
+
+    @Test
+    void canDrawCardReturnsTrueForSecondPlayerWhenItIsTheirTurn() {
+        match.getGameState().setCurrentPlayer(playerTwo);
+
+        assertTrue(validator.canDrawCard(playerTwo));
+    }
+
+    // -------------------------------------------------------------------------
+    // canDrawCard - invalid conditions
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canDrawCardReturnsFalseWhenHandContainsExactlyTenCards() {
+        addCards(playerOne, 10);
+
+        assertFalse(validator.canDrawCard(playerOne));
+    }
+
+    @Test
+    void canDrawCardReturnsFalseWhenHandContainsMoreThanTenCards() {
+        addCards(playerOne, 11);
+
+        assertFalse(validator.canDrawCard(playerOne));
+    }
+
+    @Test
+    void canDrawCardReturnsFalseWhenItIsNotPlayersTurn() {
+        assertFalse(validator.canDrawCard(playerTwo));
+    }
+
+    @Test
+    void canDrawCardReturnsFalseForForeignPlayer() {
+        assertFalse(validator.canDrawCard(foreignPlayer));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MatchStatus.class,
+            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
+    )
+    void canDrawCardReturnsFalseWhenMatchIsNotRunning(
+            MatchStatus matchStatus
+    ) {
+        match.setMatchStatus(matchStatus);
+
+        assertFalse(validator.canDrawCard(playerOne));
+    }
+
+    @Test
+    void canDrawCardRejectsNullPlayer() {
+        assertThrows(
+                NullPointerException.class,
+                () -> validator.canDrawCard(null)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // canDrawCard - no side effects
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canDrawCardDoesNotAddCardToHand() {
+        int originalCardCount = playerOne.getHandCardCount();
+
+        assertTrue(validator.canDrawCard(playerOne));
+
+        assertTrue(
+                playerOne.getHandCardCount() == originalCardCount
         );
     }
 
     @Test
-    public void canSelectCardShouldReturnFalseIfPlayerDoesNotOwnCard() {
-        Match match = createMatch();
-        MoveValidator validator = new MoveValidator(match);
-        Player player = match.getPlayerOne();
-        Card card = new Card(GameColor.PURPLE, 3);
+    void canDrawCardDoesNotChangeCurrentPlayer() {
+        validator.canDrawCard(playerOne);
 
-        assertFalse(validator.canSelectCard(player, card));
+        assertSame(
+                playerOne,
+                match.getGameState().getCurrentPlayer()
+        );
     }
 
-    private Match createMatch() {
-        Player playerOne = new Player(1, "Player One");
-        Player playerTwo = new Player(2, "Player Two");
+    // -------------------------------------------------------------------------
+    // canSelectCard - valid cases
+    // -------------------------------------------------------------------------
 
-        return new Match(playerOne, playerTwo);
+    @Test
+    void canSelectCardReturnsTrueWhenPlayerOwnsCard() {
+        playerOne.addCard(yellowCard);
+
+        assertTrue(
+                validator.canSelectCard(playerOne, yellowCard)
+        );
+    }
+
+    @Test
+    void canSelectCardReturnsTrueForSecondMatchPlayer() {
+        playerTwo.addCard(greenCard);
+
+        assertTrue(
+                validator.canSelectCard(playerTwo, greenCard)
+        );
+    }
+
+    @Test
+    void canSelectCardDoesNotRequirePlayerToBeCurrentPlayer() {
+        playerTwo.addCard(greenCard);
+
+        assertTrue(
+                validator.canSelectCard(playerTwo, greenCard)
+        );
+    }
+
+    @Test
+    void canSelectCardUsesCardEquality() {
+        Card storedCard = new Card(GameColor.YELLOW, 3);
+        Card equalCard = new Card(GameColor.YELLOW, 3);
+
+        playerOne.addCard(storedCard);
+
+        assertTrue(
+                validator.canSelectCard(playerOne, equalCard)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // canSelectCard - invalid conditions
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canSelectCardReturnsFalseWhenPlayerDoesNotOwnCard() {
+        assertFalse(
+                validator.canSelectCard(playerOne, yellowCard)
+        );
+    }
+
+    @Test
+    void canSelectCardReturnsFalseForDifferentCard() {
+        playerOne.addCard(yellowCard);
+
+        assertFalse(
+                validator.canSelectCard(playerOne, greenCard)
+        );
+    }
+
+    @Test
+    void canSelectCardReturnsFalseForForeignPlayer() {
+        foreignPlayer.addCard(yellowCard);
+
+        assertFalse(
+                validator.canSelectCard(foreignPlayer, yellowCard)
+        );
+    }
+
+    @Test
+    void canSelectCardReturnsFalseForNullPlayer() {
+        assertFalse(
+                validator.canSelectCard(null, yellowCard)
+        );
+    }
+
+    @Test
+    void canSelectCardRejectsNullCard() {
+        assertThrows(
+                NullPointerException.class,
+                () -> validator.canSelectCard(playerOne, null)
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MatchStatus.class,
+            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
+    )
+    void canSelectCardReturnsFalseWhenMatchIsNotRunning(
+            MatchStatus matchStatus
+    ) {
+        playerOne.addCard(yellowCard);
+        match.setMatchStatus(matchStatus);
+
+        assertFalse(
+                validator.canSelectCard(playerOne, yellowCard)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // canSelectCard - no side effects
+    // -------------------------------------------------------------------------
+
+    @Test
+    void canSelectCardDoesNotSelectCard() {
+        playerOne.addCard(yellowCard);
+
+        assertTrue(
+                validator.canSelectCard(playerOne, yellowCard)
+        );
+
+        assertFalse(playerOne.hasSelectedCard());
+    }
+
+    @Test
+    void canSelectCardDoesNotModifyPlayersHand() {
+        playerOne.addCard(yellowCard);
+        int originalCardCount = playerOne.getHandCardCount();
+
+        validator.canSelectCard(playerOne, yellowCard);
+
+        assertTrue(playerOne.hasCard(yellowCard));
+        assertTrue(
+                playerOne.getHandCardCount() == originalCardCount
+        );
+    }
+
+    // -------------------------------------------------------------------------
+// canUnselectCard
+// -------------------------------------------------------------------------
+
+    @Test
+    void canUnselectCardReturnsTrueForPlayerOne() {
+        assertTrue(
+                validator.canUnselectCard(playerOne)
+        );
+    }
+
+    @Test
+    void canUnselectCardReturnsTrueForPlayerTwo() {
+        assertTrue(
+                validator.canUnselectCard(playerTwo)
+        );
+    }
+
+    @Test
+    void canUnselectCardDoesNotRequirePlayerToBeCurrentPlayer() {
+        assertSame(
+                playerOne,
+                match.getGameState().getCurrentPlayer()
+        );
+
+        assertTrue(
+                validator.canUnselectCard(playerTwo)
+        );
+    }
+
+    @Test
+    void canUnselectCardReturnsTrueWhenPlayerHasSelectedCard() {
+        playerOne.addCard(yellowCard);
+        playerOne.selectCard(yellowCard);
+
+        assertTrue(
+                validator.canUnselectCard(playerOne)
+        );
+    }
+
+    @Test
+    void canUnselectCardReturnsTrueWhenPlayerHasNoSelectedCard() {
+        assertFalse(playerOne.hasSelectedCard());
+
+        assertTrue(
+                validator.canUnselectCard(playerOne)
+        );
+    }
+
+    @Test
+    void canUnselectCardReturnsFalseForForeignPlayer() {
+        assertFalse(
+                validator.canUnselectCard(foreignPlayer)
+        );
+    }
+
+    @Test
+    void canUnselectCardRejectsNullPlayer() {
+        assertThrows(
+                NullPointerException.class,
+                () -> validator.canUnselectCard(null)
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MatchStatus.class,
+            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
+    )
+    void canUnselectCardReturnsFalseWhenMatchIsNotRunning(
+            MatchStatus matchStatus
+    ) {
+        playerOne.addCard(yellowCard);
+        playerOne.selectCard(yellowCard);
+
+        match.setMatchStatus(matchStatus);
+
+        assertFalse(
+                validator.canUnselectCard(playerOne)
+        );
+    }
+
+    @Test
+    void canUnselectCardDoesNotChangeSelectedCard() {
+        playerOne.addCard(yellowCard);
+        playerOne.selectCard(yellowCard);
+
+        validator.canUnselectCard(playerOne);
+
+        assertSame(
+                yellowCard,
+                playerOne.getSelectedCard()
+        );
+    }
+
+    @Test
+    void canUnselectCardDoesNotChangeCurrentPlayer() {
+        Player currentPlayer =
+                match.getGameState().getCurrentPlayer();
+
+        validator.canUnselectCard(playerOne);
+
+        assertSame(
+                currentPlayer,
+                match.getGameState().getCurrentPlayer()
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private void addAndSelectCard(Player player, Card card) {
+        player.addCard(card);
+        player.selectCard(card);
+    }
+
+    private void addCards(Player player, int amount) {
+        for (int index = 0; index < amount; index++) {
+            GameColor color = switch (index % 4) {
+                case 0 -> GameColor.YELLOW;
+                case 1 -> GameColor.GREEN;
+                case 2 -> GameColor.CYAN;
+                default -> GameColor.PURPLE;
+            };
+
+            int value = index % 6 + 1;
+            player.addCard(new Card(color, value));
+        }
     }
 }
