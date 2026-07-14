@@ -330,7 +330,6 @@ public class GameController implements IGameController {
 
         onStateChangedListener = null;
         onMatchAbortedListener = null;
-        networkManager = null;
     }
 
     /**

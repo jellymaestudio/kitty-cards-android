@@ -68,7 +68,7 @@ public interface IGameController {
      * Registers a listener that is notified whenever the {@link kittycards.kittycardsandroid.model.GameState}
      * or the match status changes.
      * <p>
-     * Since {@link IGameController} is a singleton, the UI cannot directly observe state mutations.
+     * Since the application uses a shared controller instance, the UI cannot directly observe state mutations.
      * Instead, the UI component (e.g. the game Activity or Fragment) registers a callback here
      * to be notified and trigger a re-render accordingly.
      * <p>

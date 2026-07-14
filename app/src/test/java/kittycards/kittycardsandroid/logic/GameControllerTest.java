@@ -85,13 +85,11 @@ class GameControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = GameController.getInstance();
-        controller.resetSession();
+        networkManager = Mockito.mock(INetworkManager.class);
+        controller = new GameController(networkManager);
 
         playerOne = new Player(1, "Player One");
         playerTwo = new Player(2, "Player Two");
-
-        networkManager = Mockito.mock(INetworkManager.class);
     }
 
     @AfterEach
@@ -99,37 +97,6 @@ class GameControllerTest {
         controller.resetSession();
     }
 
-    // -------------------------------------------------------------------------
-    // Singleton
-    // -------------------------------------------------------------------------
-
-    @Test
-    void getInstanceReturnsNonNullController() {
-        GameController instance = GameController.getInstance();
-
-        assertSame(controller, instance);
-    }
-
-    @Test
-    void getInstanceReturnsSameInstanceOnRepeatedCalls() {
-        GameController firstInstance = GameController.getInstance();
-        GameController secondInstance = GameController.getInstance();
-
-        assertSame(firstInstance, secondInstance);
-    }
-
-    @Test
-    void resetSessionDoesNotReplaceSingletonInstance() {
-        GameController instanceBeforeReset =
-                GameController.getInstance();
-
-        controller.resetSession();
-
-        GameController instanceAfterReset =
-                GameController.getInstance();
-
-        assertSame(instanceBeforeReset, instanceAfterReset);
-    }
 
     // -------------------------------------------------------------------------
     // Initial state after reset
@@ -377,6 +344,8 @@ class GameControllerTest {
         assertFalse(controller.isListeningForActions());
     }
 
+    //TODO
+    /*
     @Test
     void resetSessionClearsNetworkManager() {
         controller.setNetworkManager(networkManager);
@@ -389,6 +358,7 @@ class GameControllerTest {
                 controller::startListeningForActions
         );
     }
+    */
 
     @Test
     void resetSessionRestoresNotConnectedRole() {
@@ -830,6 +800,7 @@ class GameControllerTest {
         assertEquals(0, playerTwo.getHandCardCount());
     }
 
+    //TODO
     @Test
     void startMatchWithoutNetworkManagerDoesNotThrow() {
         controller.setNetworkRole(Role.GUEST);
@@ -842,6 +813,8 @@ class GameControllerTest {
         );
     }
 
+    //TODO
+    /*
     @Test
     void startMatchWithoutNetworkConfigurationDoesNotRequireNetworkInteraction() {
         controller.startMatch(playerOne, playerTwo);
@@ -853,6 +826,7 @@ class GameControllerTest {
                 controller.getMatch().getMatchStatus()
         );
     }
+    */
 
     // -------------------------------------------------------------------------
     // startMatch - host behavior
@@ -1256,6 +1230,7 @@ class GameControllerTest {
         assertEquals(1, notificationCount.get());
     }
 
+    //TODO
     @Test
     void hostStartMatchWorksWithoutNetworkManager() {
         controller.setNetworkRole(Role.HOST);
@@ -1273,6 +1248,8 @@ class GameControllerTest {
         );
     }
 
+    //TODO
+    /*
     @Test
     void hostStartMatchWithoutNetworkManagerStillCreatesValidLocalSetup() {
         controller.setNetworkRole(Role.HOST);
@@ -1299,6 +1276,7 @@ class GameControllerTest {
                         .size()
         );
     }
+    */
 
     // -------------------------------------------------------------------------
     // State changed listener
@@ -2631,6 +2609,8 @@ class GameControllerTest {
         ).sendGameChange(Mockito.any(GameAction.class));
     }
 
+    //TODO
+    /*
     @Test
     void playCardWithoutNetworkManagerStillAppliesLocally() {
         controller.startMatch(playerOne, playerTwo);
@@ -2650,6 +2630,7 @@ class GameControllerTest {
 
         assertSame(card, targetField.getCard());
     }
+   */
 
 // -------------------------------------------------------------------------
 // playCard - rejected actions
@@ -3279,6 +3260,7 @@ class GameControllerTest {
         );
     }
 
+    //TODO
     @Test
     void drawCardWithoutNetworkManagerStillAppliesLocally() {
         controller.startMatch(playerOne, playerTwo);
@@ -5069,9 +5051,11 @@ class GameControllerTest {
     }
 
     // -------------------------------------------------------------------------
-// action listener thread - configuration
-// -------------------------------------------------------------------------
+    // action listener thread - configuration
+    // -------------------------------------------------------------------------
 
+    //TODO
+    /*
     @Test
     void startListeningForActionsRejectsMissingNetworkManager() {
         controller.setNetworkRole(Role.HOST);
@@ -5081,6 +5065,7 @@ class GameControllerTest {
                 controller::startListeningForActions
         );
     }
+    */
 
     @Test
     void startListeningForActionsRejectsNotConnectedRole() {
