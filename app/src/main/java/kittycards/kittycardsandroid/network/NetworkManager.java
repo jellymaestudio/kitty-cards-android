@@ -58,10 +58,15 @@ public class NetworkManager implements INetworkManager {
 
     @Inject
     public NetworkManager(@ApplicationContext Context context, IProtocolEngine protocolEngine) {
+        this(context, (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE), protocolEngine);
+    }
+
+    /** Constructor for testing only */
+    NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine) {
         this.context = context.getApplicationContext();
         this.protocolEngine = protocolEngine;
-        this.bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
-        this.bluetoothAdapter = bluetoothManager.getAdapter();
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
         this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
         this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
     }

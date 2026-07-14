@@ -95,10 +95,10 @@ public class BleHostTest {
 
 
     @After
-    public void resetSingleton() throws Exception {
-        var f = NetworkManager.class.getDeclaredField("instance");
-        f.setAccessible(true);
-        f.set(null, null);
+    public void tearDown() {
+        if (networkManager != null) {
+            networkManager.disconnect();
+        }
     }
 
     @Test
