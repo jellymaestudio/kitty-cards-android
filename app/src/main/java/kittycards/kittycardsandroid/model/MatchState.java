@@ -134,10 +134,15 @@ public class MatchState {
      * @param playerOne the first player
      * @param playerTwo the second player
      * @return {@code true} if the match is finished, otherwise {@code false}
+     * @throws NullPointerException if either {@code playerOne} or {@code playerTwo} is {@code null}
      */
     public boolean isMatchFinished(Player playerOne, Player playerTwo) {
         if (playerOne == null || playerTwo == null) {
             throw new NullPointerException("players cannot be null");
+        }
+
+        if (finished) {
+            return true;
         }
 
         if (playerOne.getWins() >= WINS_NEEDED) {

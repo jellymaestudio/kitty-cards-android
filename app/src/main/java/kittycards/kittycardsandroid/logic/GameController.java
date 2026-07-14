@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -125,7 +126,10 @@ public class GameController implements IGameController {
      * @param role the network role
      */
     public void setNetworkRole(Role role) {
-        this.role = role;
+        this.role = Objects.requireNonNull(
+                role,
+                "role cannot be null"
+        );
     }
 
     /**
@@ -167,7 +171,12 @@ public class GameController implements IGameController {
 
     @Override
     public void unselectCard(Player player) {
+        if (!moveValidator.canUnselectCard(player)) {
+            return;
+        }
+
         sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+
         applyUnselectCard(player);
         notifyStateChanged();
     }
