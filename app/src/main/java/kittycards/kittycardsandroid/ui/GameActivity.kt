@@ -26,7 +26,6 @@ import kittycards.kittycardsandroid.R
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kittycards.kittycardsandroid.components.IGameController
-import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.logic.GameSessionController
 import kittycards.kittycardsandroid.model.Card
 import kittycards.kittycardsandroid.model.Field
@@ -34,7 +33,6 @@ import kittycards.kittycardsandroid.model.GameColor
 import kittycards.kittycardsandroid.model.MatchStatus
 import kittycards.kittycardsandroid.model.RoundResult
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
-import kittycards.kittycardsandroid.network.OnGameConnectionListener
 
 @AndroidEntryPoint
 class GameActivity : AppCompatActivity() {
@@ -82,7 +80,6 @@ class GameActivity : AppCompatActivity() {
         }
 
     @Inject lateinit var gameController: IGameController
-    @Inject lateinit var networkManager: INetworkManager
     @Inject lateinit var gameSessionController: GameSessionController
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,6 +97,10 @@ class GameActivity : AppCompatActivity() {
 
         setupSessionControllerCallbacks()
 
+        gameSessionController.initialize(
+            remoteDisconnectDelayMillis = 2_000L
+        )
+
         gameController.setOnStateChangedListener {
             runOnUiThread {
                 renderGameState()
@@ -112,7 +113,6 @@ class GameActivity : AppCompatActivity() {
             }
         }
 
-        setupGameConnectionListener()
         registerBluetoothStateReceiver()
 
         renderGameState()
@@ -813,25 +813,18 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupGameConnectionListener() {
-        networkManager
-            .setGameConnectionListener(
-                object : OnGameConnectionListener {
-                    override fun onGamePartnerDisconnected() {
-                        handleOpponentDisconnected()
-                    }
-                }
-            )
-    }
-
     private fun setupSessionControllerCallbacks() {
         gameSessionController.onOpponentDisconnected = {
-            sessionEnding = true
-            showOpponentDisconnectedMessage()
+            runOnUiThread {
+                sessionEnding = true
+                showOpponentDisconnectedMessage()
+            }
         }
 
         gameSessionController.onSessionClosed = {
-            openLobby()
+            runOnUiThread {
+                openLobby()
+            }
         }
     }
 
@@ -884,9 +877,6 @@ class GameActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         turnInfoText.removeCallbacks(hideTurnInfoRunnable)
-
-        networkManager
-            .setGameConnectionListener(null)
 
         gameController.setOnStateChangedListener(null)
         gameController.setOnMatchAbortedListener(null)

@@ -19,64 +19,38 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import kittycards.kittycardsandroid.R
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import kittycards.kittycardsandroid.components.IGameController
-import kittycards.kittycardsandroid.components.INetworkManager
-import kittycards.kittycardsandroid.model.Player
-import kittycards.kittycardsandroid.network.GameAction
+import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.logic.JoinLobbyController
+import kittycards.kittycardsandroid.logic.JoinLobbyState
 import kittycards.kittycardsandroid.network.NetworkDevice
-import kittycards.kittycardsandroid.network.event.NetworkEvent
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
-import kittycards.kittycardsandroid.network.OnRoomConnectionListener
-import kittycards.kittycardsandroid.network.Role
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class JoinActivity : AppCompatActivity() {
 
-    @Inject lateinit var networkManager: INetworkManager
-    @Inject lateinit var gameController: IGameController
-
-    private val availableRooms = mutableListOf<NetworkDevice>()
-
-    /*
-     * The room to which a connection is currently being established.
-     *
-     * Important:
-     * This host is not yet automatically part of the room box.
-     * That happens later, after GUEST_ACCEPTED.
-     */
-    private var selectedRoom: NetworkDevice? = null
-    private var acceptedRoom: NetworkDevice? = null
-
-    @Volatile
-    private var lobbyListenerRunning = false
-
-    private var lobbyListenerThread: Thread? = null
+    @Inject
+    lateinit var joinLobbyController: JoinLobbyController
 
     private lateinit var roomPlayersContainer: LinearLayout
     private lateinit var availableRoomsContainer: LinearLayout
-
-    private var scanningStarted = false
-    private var leavingScreen = false
-    private var resettingRoomConnection = false
 
     private val bluetoothPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
             val allGranted = requiredBluetoothPermissions()
-                .all { permission -> permissions[permission] == true }
+                .all { permission ->
+                    permissions[permission] == true
+                }
 
             if (allGranted) {
-                startScanning()
+                joinLobbyController.startScanning()
             } else {
-                Toast.makeText(
-                    this,
-                    "Bluetooth permissions are required to join a game.",
-                    Toast.LENGTH_LONG
-                ).show()
+                showError(
+                    "Bluetooth permissions are required to join a game."
+                )
 
                 finish()
             }
@@ -88,25 +62,23 @@ class JoinActivity : AppCompatActivity() {
         supportActionBar?.hide()
         setContentView(R.layout.activity_join)
 
-        // networkManager is injected
-
         bindViews()
         applyWindowInsets()
+        setupControllerCallbacks()
         setupClickListeners()
         setupBackNavigation()
-        setupNetworkEventListener()
-        setupRoomConnectionListener()
-        startLobbyActionListener()
 
-        renderRoom()
-        renderAvailableRooms()
+        joinLobbyController.initialize()
 
         checkPermissionsAndStartScanning()
     }
 
     private fun bindViews() {
-        roomPlayersContainer = findViewById(R.id.roomPlayersContainer)
-        availableRoomsContainer = findViewById(R.id.availableRoomsContainer)
+        roomPlayersContainer =
+            findViewById(R.id.roomPlayersContainer)
+
+        availableRoomsContainer =
+            findViewById(R.id.availableRoomsContainer)
     }
 
     private fun applyWindowInsets() {
@@ -128,10 +100,43 @@ class JoinActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupClickListeners() {
-        findViewById<TextView>(R.id.backButton).setOnClickListener {
-            leaveRoomAndReturn()
+    private fun setupControllerCallbacks() {
+        joinLobbyController.onStateChanged = { state ->
+            runOnUiThread {
+                renderState(state)
+            }
         }
+
+        joinLobbyController.onOpenGameRequested = {
+            runOnUiThread {
+                openGameScreen()
+            }
+        }
+
+        joinLobbyController.onCloseScreenRequested = {
+            runOnUiThread {
+                finish()
+            }
+        }
+
+        joinLobbyController.onError = { message ->
+            runOnUiThread {
+                showError(message)
+            }
+        }
+
+        joinLobbyController.onWarning = { message ->
+            runOnUiThread {
+                showWarning(message)
+            }
+        }
+    }
+
+    private fun setupClickListeners() {
+        findViewById<TextView>(R.id.backButton)
+            .setOnClickListener {
+                joinLobbyController.leaveRoom()
+            }
     }
 
     private fun setupBackNavigation() {
@@ -139,68 +144,24 @@ class JoinActivity : AppCompatActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    leaveRoomAndReturn()
-                }
-            }
-        )
-    }
-
-    private fun setupNetworkEventListener() {
-        networkManager.setNetworkEventListener { event ->
-            when (event.type) {
-                NetworkEvent.NetworkMessageType.ERROR -> {
-                    Toast.makeText(
-                        this,
-                        event.message,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-
-                NetworkEvent.NetworkMessageType.WARNING -> {
-                    Toast.makeText(
-                        this,
-                        event.message,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-
-                NetworkEvent.NetworkMessageType.INFO -> {
-                    // No visible message required.
-                }
-            }
-        }
-    }
-
-    private fun setupRoomConnectionListener() {
-        networkManager.setRoomConnectionListener(
-            object : OnRoomConnectionListener {
-
-                override fun onRoomConnected(room: NetworkDevice) {
-                    /*
-                     * No visible changes are necessary in Phase A.
-                     * The host is not displayed in the
-                     * Room box until after GUEST_ACCEPTED.
-                     */
-                }
-
-                override fun onRoomDisconnected() {
-                    handleRoomClosed()
+                    joinLobbyController.leaveRoom()
                 }
             }
         )
     }
 
     private fun checkPermissionsAndStartScanning() {
-        val missingPermissions = requiredBluetoothPermissions()
-            .filter { permission ->
-                ContextCompat.checkSelfPermission(
-                    this,
-                    permission
-                ) != PackageManager.PERMISSION_GRANTED
-            }
+        val missingPermissions =
+            requiredBluetoothPermissions()
+                .filter { permission ->
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        permission
+                    ) != PackageManager.PERMISSION_GRANTED
+                }
 
         if (missingPermissions.isEmpty()) {
-            startScanning()
+            joinLobbyController.startScanning()
         } else {
             bluetoothPermissionLauncher.launch(
                 missingPermissions.toTypedArray()
@@ -209,7 +170,9 @@ class JoinActivity : AppCompatActivity() {
     }
 
     private fun requiredBluetoothPermissions(): List<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        return if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        ) {
             listOf(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
@@ -222,280 +185,59 @@ class JoinActivity : AppCompatActivity() {
         }
     }
 
-    private fun startScanning() {
-        if (scanningStarted) {
-            return
-        }
+    private fun renderState(state: JoinLobbyState) {
+        renderRoom(state.acceptedRoom)
 
-        scanningStarted = true
-
-        try {
-            networkManager.joinMatch { updatedRooms ->
-                runOnUiThread {
-                    updateAvailableRooms(updatedRooms)
-                }
-            }
-        } catch (_: SecurityException) {
-            scanningStarted = false
-
-            Toast.makeText(
-                this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    private fun startLobbyActionListener() {
-        if (lobbyListenerRunning) {
-            return
-        }
-
-        lobbyListenerRunning = true
-
-        lobbyListenerThread = Thread {
-            while (lobbyListenerRunning) {
-                try {
-                    val action = networkManager.fetchNextAction()
-
-                    when (action.type()) {
-                        GameAction.ActionType.GUEST_ACCEPTED -> {
-                            runOnUiThread {
-                                handleGuestAccepted()
-                            }
-                        }
-
-                        GameAction.ActionType.ROOM_CLOSED -> {
-                            runOnUiThread {
-                                handleRoomClosed()
-                            }
-                        }
-
-                        GameAction.ActionType.START_MATCH -> {
-                            /*
-                             * Stop the lobby listener before the GameController starts
-                             * consuming actions from the same NetworkManager queue.
-                             */
-                            lobbyListenerRunning = false
-
-                            runOnUiThread {
-                                handleStartMatch()
-                            }
-
-                            break
-                        }
-
-                        else -> {
-                            // Other actions are not handled during the lobby phase.
-                        }
-                    }
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    break
-                }
-            }
-        }.apply {
-            name = "JoinLobbyActionListener"
-            start()
-        }
-    }
-
-    private fun stopLobbyActionListener() {
-        lobbyListenerRunning = false
-
-        lobbyListenerThread?.let { thread ->
-            if (thread != Thread.currentThread()) {
-                thread.interrupt()
-            }
-        }
-
-        lobbyListenerThread = null
-    }
-
-    private fun handleGuestAccepted() {
-        val pendingRoom = selectedRoom ?: return
-
-        acceptedRoom = pendingRoom
-        availableRooms.clear()
-
-        renderRoom()
-        renderAvailableRooms()
-    }
-
-    private fun handleStartMatch() {
-        if (leavingScreen) {
-            return
-        }
-
-        val hostRoom = acceptedRoom
-
-        if (hostRoom == null) {
-            Toast.makeText(
-                this,
-                "The match cannot start because no host was accepted.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        /*
-         * The lobby listener already stopped itself after receiving
-         * START_MATCH. We only clear the stored thread reference here.
-         */
-        lobbyListenerThread = null
-
-        val hostPlayer = Player(
-            0,
-            "Host"
-        )
-
-        val guestPlayer = Player(
-            1,
-            "Guest"
-        )
-
-        // gameController is injected
-
-        gameController.setNetworkRole(Role.GUEST)
-        gameController.setLocalPlayer(guestPlayer)
-
-        /*
-         * On the guest device this only initializes the local match.
-         * It does not send board colors or cards because the role is GUEST.
-         */
-        gameController.startMatch(
-            hostPlayer,
-            guestPlayer
-        )
-
-        /*
-         * From this point onward, the GameController is the only consumer
-         * of incoming gameplay actions.
-         */
-        gameController.startListeningForActions()
-
-        try {
-            networkManager.sendGameChange(
-                GameAction(
-                    GameAction.ActionType.MATCH_READY
-                )
-            )
-        } catch (_: SecurityException) {
-            Toast.makeText(
-                this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        openGameScreen()
-    }
-
-    private fun handleRoomClosed() {
-        if (leavingScreen || resettingRoomConnection) {
-            return
-        }
-
-        resettingRoomConnection = true
-
-        selectedRoom = null
-        acceptedRoom = null
-        availableRooms.clear()
-
-        renderRoom()
-        renderAvailableRooms()
-
-        scanningStarted = false
-
-        /*
-         * Close the old GATT connection explicitly.
-         *
-         * ROOM_CLOSED may arrive before Android reports the physical
-         * BLE disconnection. Without this cleanup, the previous
-         * connection can remain internally active.
-         */
-        try {
-            networkManager.disconnect()
-        } catch (_: SecurityException) {
-            // Continue with the UI reset even if permission was revoked.
-        }
-
-        availableRoomsContainer.postDelayed(
-            {
-                if (!leavingScreen) {
-                    resettingRoomConnection = false
-                    startScanning()
-                }
-            },
-            500L
+        renderAvailableRooms(
+            rooms = state.availableRooms,
+            selectedRoom = state.selectedRoom,
+            roomAccepted = state.acceptedRoom != null
         )
     }
 
-    private fun updateAvailableRooms(
-        updatedRooms: List<NetworkDevice>
+    private fun renderRoom(
+        acceptedRoom: NetworkDevice?
     ) {
-        /*
-         * As long as no room has been selected yet, we will
-         * copy the current scan list in its entirety.
-         */
-        if (selectedRoom == null) {
-            availableRooms.clear()
-            availableRooms.addAll(updatedRooms)
-        } else {
-            /*
-             * After the selection is made, BleGuest stops the scan.
-             * The selected room remains visible so that
-             * “...” can continue to be displayed there.
-             */
-            val pendingRoom = selectedRoom
-
-            availableRooms.clear()
-            availableRooms.addAll(updatedRooms)
-
-            if (
-                pendingRoom != null &&
-                availableRooms.none { room -> room == pendingRoom }
-            ) {
-                availableRooms.add(pendingRoom)
-            }
-        }
-
-        renderAvailableRooms()
-    }
-
-    private fun renderRoom() {
         roomPlayersContainer.removeAllViews()
 
         roomPlayersContainer.addView(
             createRoomPlayerRow(
                 text = "${getDeviceName()} (You)",
-                backgroundColor = getColor(R.color.kc_guest)
+                backgroundColor =
+                    getColor(R.color.kc_guest)
             )
         )
 
         acceptedRoom?.let { room ->
             roomPlayersContainer.addView(
                 createRoomPlayerRow(
-                    text = room.deviceName() ?: "Unknown Host",
-                    backgroundColor = getColor(R.color.kc_host)
+                    text =
+                        room.deviceName()
+                            ?: "Unknown Host",
+                    backgroundColor =
+                        getColor(R.color.kc_host)
                 )
             )
         }
     }
 
-    private fun renderAvailableRooms() {
+    private fun renderAvailableRooms(
+        rooms: List<NetworkDevice>,
+        selectedRoom: NetworkDevice?,
+        roomAccepted: Boolean
+    ) {
         availableRoomsContainer.removeAllViews()
 
-        if (acceptedRoom != null) {
+        if (roomAccepted) {
             return
         }
 
-        availableRooms.forEachIndexed { index, room ->
+        rooms.forEachIndexed { index, room ->
             availableRoomsContainer.addView(
                 createAvailableRoomRow(
                     room = room,
-                    index = index
+                    index = index,
+                    selectedRoom = selectedRoom
                 )
             )
         }
@@ -508,8 +250,13 @@ class JoinActivity : AppCompatActivity() {
         return TextView(this).apply {
             this.text = text
             textSize = 18f
-            setTextColor(getColor(android.R.color.black))
+
+            setTextColor(
+                getColor(android.R.color.black)
+            )
+
             setBackgroundColor(backgroundColor)
+
             gravity = Gravity.CENTER_VERTICAL
 
             setPadding(
@@ -530,11 +277,13 @@ class JoinActivity : AppCompatActivity() {
 
     private fun createAvailableRoomRow(
         room: NetworkDevice,
-        index: Int
+        index: Int,
+        selectedRoom: NetworkDevice?
     ): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+
             setBackgroundColor(
                 GameColorMapper.playerListColor(index)
             )
@@ -548,11 +297,21 @@ class JoinActivity : AppCompatActivity() {
         }
 
         val nameText = TextView(this).apply {
-            text = room.deviceName() ?: "Unknown Room"
+            text =
+                room.deviceName()
+                    ?: "Unknown Room"
+
             textSize = 18f
-            setTextColor(getColor(android.R.color.black))
+
+            setTextColor(
+                getColor(android.R.color.black)
+            )
+
             setSingleLine(true)
-            ellipsize = android.text.TextUtils.TruncateAt.END
+
+            ellipsize =
+                android.text.TextUtils.TruncateAt.END
+
             gravity = Gravity.CENTER_VERTICAL
 
             setPadding(
@@ -569,36 +328,48 @@ class JoinActivity : AppCompatActivity() {
             )
         }
 
-        val isPendingRoom = selectedRoom == room
+        val isPendingRoom =
+            selectedRoom == room
+
         val anotherRoomIsPending =
-            selectedRoom != null && !isPendingRoom
+            selectedRoom != null &&
+                    !isPendingRoom
 
         val joinButton = Button(this).apply {
-            text = if (isPendingRoom) "..." else "✓"
+            text =
+                if (isPendingRoom) {
+                    "..."
+                } else {
+                    "✓"
+                }
+
             textSize = 22f
-            setTextColor(getColor(android.R.color.white))
-            setBackgroundColor(getColor(R.color.kc_dark_grey))
+
+            setTextColor(
+                getColor(android.R.color.white)
+            )
+
+            setBackgroundColor(
+                getColor(R.color.kc_dark_grey)
+            )
 
             layoutParams = LinearLayout.LayoutParams(
                 56.dp(),
                 MATCH_PARENT
             )
 
-            /*
-             * Once a room has been selected:
-             * - its button displays “...”
-             * - all other buttons disappear
-             */
-            visibility = if (anotherRoomIsPending) {
-                View.INVISIBLE
-            } else {
-                View.VISIBLE
-            }
+            visibility =
+                if (anotherRoomIsPending) {
+                    View.INVISIBLE
+                } else {
+                    View.VISIBLE
+                }
 
-            isEnabled = selectedRoom == null
+            isEnabled =
+                selectedRoom == null
 
             setOnClickListener {
-                requestRoomJoin(room)
+                joinLobbyController.requestRoomJoin(room)
             }
         }
 
@@ -606,48 +377,6 @@ class JoinActivity : AppCompatActivity() {
         row.addView(joinButton)
 
         return row
-    }
-
-    private fun requestRoomJoin(room: NetworkDevice) {
-        if (selectedRoom != null) {
-            return
-        }
-
-        try {
-            networkManager.confirmRoom(room)
-        } catch (_: SecurityException) {
-            Toast.makeText(
-                this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
-
-        /*
-         * Only after the method has been successfully called do we
-         * set the local UI state to “waiting.”
-         */
-        selectedRoom = room
-        renderAvailableRooms()
-    }
-
-    private fun leaveRoomAndReturn() {
-        if (leavingScreen) {
-            return
-        }
-
-        leavingScreen = true
-        stopLobbyActionListener()
-
-        try {
-            networkManager.disconnect()
-        } catch (_: SecurityException) {
-            // The Activity can still close if permission was revoked.
-        }
-
-        scanningStarted = false
-        finish()
     }
 
     private fun openGameScreen() {
@@ -661,11 +390,24 @@ class JoinActivity : AppCompatActivity() {
         finish()
     }
 
-    override fun onDestroy() {
-        stopLobbyActionListener()
+    private fun showError(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+    }
 
-        networkManager.setNetworkEventListener(null)
-        networkManager.setRoomConnectionListener(null)
+    private fun showWarning(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    override fun onDestroy() {
+        joinLobbyController.cleanup()
 
         super.onDestroy()
     }

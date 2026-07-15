@@ -19,55 +19,39 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import kittycards.kittycardsandroid.R
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import kittycards.kittycardsandroid.components.IGameController
-import kittycards.kittycardsandroid.components.INetworkManager
-import kittycards.kittycardsandroid.model.Player
-import kittycards.kittycardsandroid.network.GameAction
+import kittycards.kittycardsandroid.R
+import kittycards.kittycardsandroid.logic.HostLobbyController
+import kittycards.kittycardsandroid.logic.HostLobbyState
 import kittycards.kittycardsandroid.network.NetworkDevice
-import kittycards.kittycardsandroid.network.Role
-import kittycards.kittycardsandroid.network.event.NetworkEvent
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class HostActivity : AppCompatActivity() {
 
-    @Inject lateinit var networkManager: INetworkManager
-    @Inject lateinit var gameController: IGameController
-
-    private val availableGuests = mutableListOf<NetworkDevice>()
-    private var selectedGuest: NetworkDevice? = null
+    @Inject
+    lateinit var hostLobbyController: HostLobbyController
 
     private lateinit var roomPlayersContainer: LinearLayout
     private lateinit var availablePlayersContainer: LinearLayout
     private lateinit var startMatchButton: Button
-
-    private var hostingStarted = false
-    private var leavingScreen = false
-    private var matchStartRequested = false
-
-    @Volatile
-    private var lobbyListenerRunning = false
-
-    private var lobbyListenerThread: Thread? = null
 
     private val bluetoothPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
             val allGranted = requiredBluetoothPermissions()
-                .all { permission -> permissions[permission] == true }
+                .all { permission ->
+                    permissions[permission] == true
+                }
 
             if (allGranted) {
-                startHosting()
+                hostLobbyController.startHosting()
             } else {
-                Toast.makeText(
-                    this,
-                    "Bluetooth permissions are required to host a game.",
-                    Toast.LENGTH_LONG
-                ).show()
+                showError(
+                    "Bluetooth permissions are required to host a game."
+                )
 
                 finish()
             }
@@ -79,26 +63,26 @@ class HostActivity : AppCompatActivity() {
         supportActionBar?.hide()
         setContentView(R.layout.activity_host)
 
-        // networkManager is injected
-
         bindViews()
         applyWindowInsets()
+        setupControllerCallbacks()
         setupClickListeners()
         setupBackNavigation()
-        setupNetworkEventListener()
 
-        renderRoom()
-        renderAvailablePlayers()
-
-        startMatchButton.isEnabled = false
+        hostLobbyController.initialize()
 
         checkPermissionsAndStartHosting()
     }
 
     private fun bindViews() {
-        roomPlayersContainer = findViewById(R.id.roomPlayersContainer)
-        availablePlayersContainer = findViewById(R.id.availablePlayersContainer)
-        startMatchButton = findViewById(R.id.startMatchButton)
+        roomPlayersContainer =
+            findViewById(R.id.roomPlayersContainer)
+
+        availablePlayersContainer =
+            findViewById(R.id.availablePlayersContainer)
+
+        startMatchButton =
+            findViewById(R.id.startMatchButton)
     }
 
     private fun applyWindowInsets() {
@@ -120,160 +104,47 @@ class HostActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupClickListeners() {
-        findViewById<TextView>(R.id.backButton).setOnClickListener {
-            closeRoomAndReturn()
+    private fun setupControllerCallbacks() {
+        hostLobbyController.onStateChanged = { state ->
+            runOnUiThread {
+                renderState(state)
+            }
         }
+
+        hostLobbyController.onOpenGameRequested = {
+            runOnUiThread {
+                openGameScreen()
+            }
+        }
+
+        hostLobbyController.onCloseScreenRequested = {
+            runOnUiThread {
+                finish()
+            }
+        }
+
+        hostLobbyController.onError = { message ->
+            runOnUiThread {
+                showError(message)
+            }
+        }
+
+        hostLobbyController.onWarning = { message ->
+            runOnUiThread {
+                showWarning(message)
+            }
+        }
+    }
+
+    private fun setupClickListeners() {
+        findViewById<TextView>(R.id.backButton)
+            .setOnClickListener {
+                hostLobbyController.closeRoom()
+            }
 
         startMatchButton.setOnClickListener {
-            requestMatchStart()
+            hostLobbyController.requestMatchStart()
         }
-    }
-
-    private fun requestMatchStart() {
-        if (
-            selectedGuest == null ||
-            matchStartRequested
-        ) {
-            return
-        }
-
-        matchStartRequested = true
-        startMatchButton.isEnabled = false
-
-        try {
-            /*
-             * The room must disappear from other guests' scan results,
-             * while the selected guest connection remains active.
-             */
-            networkManager.stopRoomDiscovery()
-
-            /*
-             * The host now waits for MATCH_READY from the selected guest.
-             */
-            startLobbyActionListener()
-
-            networkManager.sendGameChange(
-                GameAction(
-                    GameAction.ActionType.START_MATCH
-                )
-            )
-        } catch (_: SecurityException) {
-            matchStartRequested = false
-            startMatchButton.isEnabled = selectedGuest != null
-
-            Toast.makeText(
-                this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    private fun startLobbyActionListener() {
-        if (lobbyListenerRunning) {
-            return
-        }
-
-        lobbyListenerRunning = true
-
-        lobbyListenerThread = Thread {
-            while (lobbyListenerRunning) {
-                try {
-                    val action = networkManager.fetchNextAction()
-
-                    when (action.type()) {
-                        GameAction.ActionType.MATCH_READY -> {
-                            lobbyListenerRunning = false
-
-                            runOnUiThread {
-                                handleMatchReady()
-                            }
-
-                            break
-                        }
-
-                        else -> {
-                            // No other lobby actions are expected by the host here.
-                        }
-                    }
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    break
-                }
-            }
-        }.apply {
-            name = "HostLobbyActionListener"
-            start()
-        }
-    }
-
-    private fun stopLobbyActionListener() {
-        lobbyListenerRunning = false
-
-        lobbyListenerThread?.let { thread ->
-            if (thread != Thread.currentThread()) {
-                thread.interrupt()
-            }
-        }
-
-        lobbyListenerThread = null
-    }
-
-    private fun handleMatchReady() {
-        if (leavingScreen || !matchStartRequested) {
-            return
-        }
-
-        /*
-         * The lobby thread already stopped after consuming MATCH_READY.
-         */
-        lobbyListenerThread = null
-
-        val hostPlayer = Player(
-            0,
-            "Host"
-        )
-
-        val guestPlayer = Player(
-            1,
-            "Guest"
-        )
-
-        // gameController is injected
-
-        gameController.setNetworkRole(Role.HOST)
-        gameController.setLocalPlayer(hostPlayer)
-
-        /*
-         * Because this device is HOST, startMatch() also sends:
-         * - the starting player
-         * - the eight board colors
-         * - the five initial cards
-         */
-        gameController.startMatch(
-            hostPlayer,
-            guestPlayer
-        )
-
-        /*
-         * From now on the GameController is the only consumer of
-         * incoming gameplay actions.
-         */
-        gameController.startListeningForActions()
-
-        openGameScreen()
-    }
-
-    private fun openGameScreen() {
-        startActivity(
-            Intent(
-                this,
-                GameActivity::class.java
-            )
-        )
-
-        finish()
     }
 
     private fun setupBackNavigation() {
@@ -281,49 +152,24 @@ class HostActivity : AppCompatActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    closeRoomAndReturn()
+                    hostLobbyController.closeRoom()
                 }
             }
         )
     }
 
-    private fun setupNetworkEventListener() {
-        networkManager.setNetworkEventListener { event ->
-            when (event.type) {
-                NetworkEvent.NetworkMessageType.ERROR -> {
-                    Toast.makeText(
-                        this,
-                        event.message,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-
-                NetworkEvent.NetworkMessageType.WARNING -> {
-                    Toast.makeText(
-                        this,
-                        event.message,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-
-                NetworkEvent.NetworkMessageType.INFO -> {
-                    // Information events do not need to be displayed.
-                }
-            }
-        }
-    }
-
     private fun checkPermissionsAndStartHosting() {
-        val missingPermissions = requiredBluetoothPermissions()
-            .filter { permission ->
-                ContextCompat.checkSelfPermission(
-                    this,
-                    permission
-                ) != PackageManager.PERMISSION_GRANTED
-            }
+        val missingPermissions =
+            requiredBluetoothPermissions()
+                .filter { permission ->
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        permission
+                    ) != PackageManager.PERMISSION_GRANTED
+                }
 
         if (missingPermissions.isEmpty()) {
-            startHosting()
+            hostLobbyController.startHosting()
         } else {
             bluetoothPermissionLauncher.launch(
                 missingPermissions.toTypedArray()
@@ -332,7 +178,9 @@ class HostActivity : AppCompatActivity() {
     }
 
     private fun requiredBluetoothPermissions(): List<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        return if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        ) {
             listOf(
                 Manifest.permission.BLUETOOTH_ADVERTISE,
                 Manifest.permission.BLUETOOTH_CONNECT,
@@ -345,56 +193,28 @@ class HostActivity : AppCompatActivity() {
         }
     }
 
-    private fun startHosting() {
-        if (hostingStarted) {
-            return
-        }
+    private fun renderState(state: HostLobbyState) {
+        renderRoom(state.selectedGuest)
 
-        hostingStarted = true
-
-        try {
-            networkManager.hostMatch { connectedGuests ->
-                updateAvailableGuests(connectedGuests)
-            }
-        } catch (_: SecurityException) {
-            hostingStarted = false
-
-            Toast.makeText(
-                this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    private fun updateAvailableGuests(
-        connectedGuests: List<NetworkDevice>
-    ) {
-        val acceptedGuest = selectedGuest
-
-        if (
-            acceptedGuest != null &&
-            connectedGuests.none { guest -> guest == acceptedGuest }
-        ) {
-            selectedGuest = null
-        }
-
-        availableGuests.clear()
-        availableGuests.addAll(
-            connectedGuests.filter { guest -> guest != selectedGuest }
+        renderAvailablePlayers(
+            guests = state.availableGuests,
+            guestSelected = state.selectedGuest != null
         )
 
-        renderRoom()
-        renderAvailablePlayers()
+        startMatchButton.isEnabled =
+            state.canStartMatch
     }
 
-    private fun renderRoom() {
+    private fun renderRoom(
+        selectedGuest: NetworkDevice?
+    ) {
         roomPlayersContainer.removeAllViews()
 
         roomPlayersContainer.addView(
             createRoomPlayerRow(
                 text = "${getDeviceName()} (You)",
-                backgroundColor = getColor(R.color.kc_host)
+                backgroundColor =
+                    getColor(R.color.kc_host)
             )
         )
 
@@ -402,22 +222,25 @@ class HostActivity : AppCompatActivity() {
             roomPlayersContainer.addView(
                 createRoomPlayerRow(
                     text = getGuestDisplayName(guest),
-                    backgroundColor = getColor(R.color.kc_guest)
+                    backgroundColor =
+                        getColor(R.color.kc_guest)
                 )
             )
         }
-
-        startMatchButton.isEnabled = selectedGuest != null
     }
 
-    private fun renderAvailablePlayers() {
+    private fun renderAvailablePlayers(
+        guests: List<NetworkDevice>,
+        guestSelected: Boolean
+    ) {
         availablePlayersContainer.removeAllViews()
 
-        availableGuests.forEachIndexed { index, guest ->
+        guests.forEachIndexed { index, guest ->
             availablePlayersContainer.addView(
                 createAvailablePlayerRow(
                     guest = guest,
-                    index = index
+                    index = index,
+                    guestSelected = guestSelected
                 )
             )
         }
@@ -430,9 +253,15 @@ class HostActivity : AppCompatActivity() {
         return TextView(this).apply {
             this.text = text
             textSize = 18f
-            setTextColor(getColor(android.R.color.black))
+
+            setTextColor(
+                getColor(android.R.color.black)
+            )
+
             setBackgroundColor(backgroundColor)
+
             gravity = Gravity.CENTER_VERTICAL
+
             setPadding(
                 16.dp(),
                 0,
@@ -451,11 +280,13 @@ class HostActivity : AppCompatActivity() {
 
     private fun createAvailablePlayerRow(
         guest: NetworkDevice,
-        index: Int
+        index: Int,
+        guestSelected: Boolean
     ): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+
             setBackgroundColor(
                 GameColorMapper.playerListColor(index)
             )
@@ -471,10 +302,18 @@ class HostActivity : AppCompatActivity() {
         val nameText = TextView(this).apply {
             text = getGuestDisplayName(guest)
             textSize = 18f
-            setTextColor(getColor(android.R.color.black))
+
+            setTextColor(
+                getColor(android.R.color.black)
+            )
+
             setSingleLine(true)
-            ellipsize = android.text.TextUtils.TruncateAt.END
+
+            ellipsize =
+                android.text.TextUtils.TruncateAt.END
+
             gravity = Gravity.CENTER_VERTICAL
+
             setPadding(
                 16.dp(),
                 0,
@@ -492,22 +331,29 @@ class HostActivity : AppCompatActivity() {
         val acceptButton = Button(this).apply {
             text = "✓"
             textSize = 22f
-            setTextColor(getColor(android.R.color.white))
-            setBackgroundColor(getColor(R.color.kc_dark_grey))
+
+            setTextColor(
+                getColor(android.R.color.white)
+            )
+
+            setBackgroundColor(
+                getColor(R.color.kc_dark_grey)
+            )
 
             layoutParams = LinearLayout.LayoutParams(
                 56.dp(),
                 MATCH_PARENT
             )
 
-            visibility = if (selectedGuest == null) {
-                View.VISIBLE
-            } else {
-                View.INVISIBLE
-            }
+            visibility =
+                if (guestSelected) {
+                    View.INVISIBLE
+                } else {
+                    View.VISIBLE
+                }
 
             setOnClickListener {
-                acceptGuest(guest)
+                hostLobbyController.selectGuest(guest)
             }
         }
 
@@ -517,50 +363,35 @@ class HostActivity : AppCompatActivity() {
         return row
     }
 
-    private fun acceptGuest(guest: NetworkDevice) {
-        if (selectedGuest != null) {
-            return
-        }
-
-        try {
-            networkManager.selectGuest(guest)
-        } catch (_: SecurityException) {
-            Toast.makeText(
+    private fun openGameScreen() {
+        startActivity(
+            Intent(
                 this,
-                "Bluetooth permission is missing.",
-                Toast.LENGTH_LONG
-            ).show()
-            return
-        }
+                GameActivity::class.java
+            )
+        )
 
-        selectedGuest = guest
-        availableGuests.remove(guest)
-
-        renderRoom()
-        renderAvailablePlayers()
-    }
-
-    private fun closeRoomAndReturn() {
-        if (leavingScreen) {
-            return
-        }
-
-        leavingScreen = true
-        stopLobbyActionListener()
-
-        try {
-            networkManager.closeRoom()
-        } catch (_: SecurityException) {
-            // The Activity can still close if permission was revoked.
-        }
-
-        hostingStarted = false
         finish()
     }
 
+    private fun showError(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun showWarning(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
     override fun onDestroy() {
-        stopLobbyActionListener()
-        networkManager.setNetworkEventListener(null)
+        hostLobbyController.cleanup()
 
         super.onDestroy()
     }
@@ -572,7 +403,9 @@ class HostActivity : AppCompatActivity() {
         ) ?: Build.MODEL
     }
 
-    private fun getGuestDisplayName(guest: NetworkDevice): String {
+    private fun getGuestDisplayName(
+        guest: NetworkDevice
+    ): String {
         val deviceName = guest.deviceName()
 
         return if (!deviceName.isNullOrBlank()) {
