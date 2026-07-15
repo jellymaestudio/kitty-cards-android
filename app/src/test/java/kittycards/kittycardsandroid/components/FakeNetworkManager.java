@@ -69,6 +69,10 @@ public class FakeNetworkManager implements INetworkManager {
         return new ArrayList<>(sentActions);
     }
 
+    public void clearSentActions() {
+        sentActions.clear();
+    }
+
     // --- INetworkManager Implementation ---
 
     @Override

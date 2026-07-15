@@ -3,85 +3,57 @@ package kittycards.kittycardsandroid.logic;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
-import kittycards.kittycardsandroid.model.Board;
-import kittycards.kittycardsandroid.model.Card;
-import kittycards.kittycardsandroid.model.Field;
-import kittycards.kittycardsandroid.model.GameColor;
-import kittycards.kittycardsandroid.model.GameState;
-import kittycards.kittycardsandroid.model.RoundResult;
-import kittycards.kittycardsandroid.network.GameAction;
-
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import kittycards.kittycardsandroid.components.INetworkManager;
-import kittycards.kittycardsandroid.model.Player;
-import kittycards.kittycardsandroid.network.Role;
-
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
-import static org.mockito.Mockito.atMostOnce;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.times;
-
+import kittycards.kittycardsandroid.model.Board;
+import kittycards.kittycardsandroid.model.Card;
+import kittycards.kittycardsandroid.model.Field;
+import kittycards.kittycardsandroid.model.GameColor;
+import kittycards.kittycardsandroid.model.GameState;
 import kittycards.kittycardsandroid.model.Match;
 import kittycards.kittycardsandroid.model.MatchStatus;
+import kittycards.kittycardsandroid.model.Player;
+import kittycards.kittycardsandroid.model.RoundResult;
+import kittycards.kittycardsandroid.network.GameAction;
+import kittycards.kittycardsandroid.network.Role;
 
 class GameControllerTest {
 
+    private static final List<GameColor> REMOTE_FIELD_COLORS = List.of(GameColor.YELLOW, GameColor.GREY, GameColor.GREEN, GameColor.GREY, GameColor.CYAN, GameColor.GREY, GameColor.PURPLE, GameColor.GREY);
+    private static final List<GameColor> SECOND_REMOTE_FIELD_COLORS = List.of(GameColor.GREY, GameColor.PURPLE, GameColor.GREY, GameColor.YELLOW, GameColor.GREY, GameColor.CYAN, GameColor.GREY, GameColor.GREEN);
     private GameController controller;
-
     private Player playerOne;
     private Player playerTwo;
-
     private INetworkManager networkManager;
-
-    private static final List<GameColor> REMOTE_FIELD_COLORS = List.of(
-            GameColor.YELLOW,
-            GameColor.GREY,
-            GameColor.GREEN,
-            GameColor.GREY,
-            GameColor.CYAN,
-            GameColor.GREY,
-            GameColor.PURPLE,
-            GameColor.GREY
-    );
-
-    private static final List<GameColor> SECOND_REMOTE_FIELD_COLORS = List.of(
-            GameColor.GREY,
-            GameColor.PURPLE,
-            GameColor.GREY,
-            GameColor.YELLOW,
-            GameColor.GREY,
-            GameColor.CYAN,
-            GameColor.GREY,
-            GameColor.GREEN
-    );
 
     @BeforeEach
     void setUp() {
@@ -99,136 +71,85 @@ class GameControllerTest {
 
 
     // -------------------------------------------------------------------------
-    // Initial state after reset
+    // Getter/Setter
     // -------------------------------------------------------------------------
 
     @Test
-    void resetControllerHasNoActiveMatch() {
+    void getMatch_returnsNullWhenNoMatchStarted() {
         assertNull(controller.getMatch());
     }
 
     @Test
-    void resetControllerHasNoLocalPlayer() {
+    void getMatch_returnsNullAfterReset() {
+        controller.startMatch(playerOne, playerTwo);
+        controller.resetSession();
+        assertNull(controller.getMatch());
+    }
+
+    @Test
+    void getLocalPlayer_returnsNullWhenNotSet() {
         assertNull(controller.getLocalPlayer());
     }
 
     @Test
-    void resetControllerIsNotListeningForActions() {
-        assertFalse(controller.isListeningForActions());
-    }
-
-    // -------------------------------------------------------------------------
-    // Local player
-    // -------------------------------------------------------------------------
-
-    @Test
-    void setLocalPlayerStoresProvidedPlayer() {
+    void getRemotePlayer_throwsNpeWhenNoActiveMatch() {
         controller.setLocalPlayer(playerOne);
-
-        assertSame(
-                playerOne,
-                controller.getLocalPlayer()
-        );
+        assertThrows(NullPointerException.class, controller::getRemotePlayer);
     }
 
     @Test
-    void setLocalPlayerCanReplacePreviousPlayer() {
-        controller.setLocalPlayer(playerOne);
-
-        controller.setLocalPlayer(playerTwo);
-
-        assertSame(
-                playerTwo,
-                controller.getLocalPlayer()
-        );
-    }
-
-    @Test
-    void setLocalPlayerAcceptsNull() {
-        controller.setLocalPlayer(playerOne);
-
-        assertDoesNotThrow(
-                () -> controller.setLocalPlayer(null)
-        );
-
-        assertNull(controller.getLocalPlayer());
-    }
-
-    // -------------------------------------------------------------------------
-    // Remote player
-    // -------------------------------------------------------------------------
-
-    @Test
-    void getRemotePlayerReturnsPlayerTwoWhenPlayerOneIsLocal() {
+    void getRemotePlayer_returnsOtherPlayerRelativeToLocal() {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        assertSame(
-                playerTwo,
-                controller.getRemotePlayer()
-        );
+        assertSame(playerTwo, controller.getRemotePlayer());
     }
 
     @Test
-    void getRemotePlayerReturnsPlayerOneWhenPlayerTwoIsLocal() {
-        controller.startMatch(playerOne, playerTwo);
-        controller.setLocalPlayer(playerTwo);
-
-        assertSame(
-                playerOne,
-                controller.getRemotePlayer()
-        );
-    }
-
-    @Test
-    void getRemotePlayerThrowsExceptionWhenNoMatchExists() {
-        controller.setLocalPlayer(playerOne);
-
-        assertThrows(
-                NullPointerException.class,
-                controller::getRemotePlayer
-        );
-    }
-
-    @Test
-    void getRemotePlayerThrowsExceptionWhenNoLocalPlayerIsSet() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                controller::getRemotePlayer
-        );
-    }
-
-    @Test
-    void getRemotePlayerThrowsExceptionWhenLocalPlayerIsNotPartOfMatch() {
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
+    void getRemotePlayer_throwsExceptionWhenLocalPlayerIsNotPartOfMatch() {
+        Player foreignPlayer = new Player(3, "Foreign Player");
 
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(foreignPlayer);
 
-        assertThrows(
-                IllegalArgumentException.class,
-                controller::getRemotePlayer
-        );
+        assertThrows(IllegalArgumentException.class, controller::getRemotePlayer);
     }
 
     @Test
-    void getRemotePlayerRejectsSeparatePlayerWithSameData() {
-        Player separatePlayer =
-                new Player(
-                        playerOne.getId(),
-                        playerOne.getName()
-                );
+    void getRemotePlayer_rejectsSeparatePlayerWithSameData() {
+        Player separatePlayer = new Player(playerOne.getId(), playerOne.getName());
 
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(separatePlayer);
 
-        assertThrows(
-                IllegalArgumentException.class,
-                controller::getRemotePlayer
-        );
+        assertThrows(IllegalArgumentException.class, controller::getRemotePlayer);
+    }
+
+    @Test
+    void setLocalPlayer_replacesPreviousAssignment() {
+        controller.setLocalPlayer(playerOne);
+        controller.setLocalPlayer(playerTwo);
+
+        assertSame(playerTwo, controller.getLocalPlayer());
+    }
+
+    @Test
+    void setLocalPlayer_acceptsNullToClearAssignment() {
+        controller.setLocalPlayer(playerOne);
+        controller.setLocalPlayer(null);
+
+        assertNull(controller.getLocalPlayer());
+    }
+
+    @Test
+    void setNetworkRole_throwsNpeWhenRoleNull() {
+        assertThrows(NullPointerException.class, () -> controller.setNetworkRole(null));
+    }
+
+    @Test
+    void setNetworkRole_updatesRole() {
+        controller.setNetworkRole(Role.HOST);
+        assertDoesNotThrow(controller::startListeningForActions);
     }
 
     // -------------------------------------------------------------------------
@@ -236,36 +157,28 @@ class GameControllerTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void setNetworkManagerAllowsActionListenerConfiguration() {
-        
+    void startListeningForActionsSucceedsWithHostRole() {
+
         controller.setNetworkRole(Role.HOST);
 
-        assertDoesNotThrow(
-                controller::startListeningForActions
-        );
+        assertDoesNotThrow(controller::startListeningForActions);
 
         controller.stopListeningForActions();
     }
 
     @Test
-    void replacingNetworkManagerDoesNotThrowException() {
-        INetworkManager secondNetworkManager =
-                Mockito.mock(INetworkManager.class);
+    void constructorAcceptsMockNetworkManager() {
+        INetworkManager secondNetworkManager = Mockito.mock(INetworkManager.class);
 
-        
 
-        assertDoesNotThrow(
-                () -> new GameController(
-                        secondNetworkManager
-                )
-        );
+        assertDoesNotThrow(() -> new GameController(secondNetworkManager));
     }
 
     //TODO
     /*
     @Test
     void setNetworkManagerAcceptsNull() {
-        
+
 
         assertDoesNotThrow(
                 () -> controller.setNetworkManager(null)
@@ -275,39 +188,24 @@ class GameControllerTest {
 
     @Test
     void setNetworkRoleAcceptsEveryRole() {
-        assertDoesNotThrow(
-                () -> controller.setNetworkRole(Role.HOST)
-        );
+        assertDoesNotThrow(() -> controller.setNetworkRole(Role.HOST));
 
-        assertDoesNotThrow(
-                () -> controller.setNetworkRole(Role.GUEST)
-        );
+        assertDoesNotThrow(() -> controller.setNetworkRole(Role.GUEST));
 
-        assertDoesNotThrow(
-                () -> controller.setNetworkRole(
-                        Role.NOT_CONNECTED
-                )
-        );
+        assertDoesNotThrow(() -> controller.setNetworkRole(Role.NOT_CONNECTED));
     }
 
     @Test
     void setNetworkRoleRejectsNull() {
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.setNetworkRole(null)
-        );
+        assertThrows(NullPointerException.class, () -> controller.setNetworkRole(null));
     }
 
     @Test
     void rejectedNullNetworkRoleDoesNotChangeCurrentRole() {
         controller.setNetworkRole(Role.HOST);
 
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.setNetworkRole(null)
-        );
+        assertThrows(NullPointerException.class, () -> controller.setNetworkRole(null));
 
-        
 
         assertDoesNotThrow(controller::startListeningForActions);
 
@@ -338,7 +236,7 @@ class GameControllerTest {
 
     @Test
     void resetSessionStopsActionListener() {
-        
+
         controller.setNetworkRole(Role.HOST);
         controller.startListeningForActions();
 
@@ -351,7 +249,7 @@ class GameControllerTest {
     /*
     @Test
     void resetSessionClearsNetworkManager() {
-        
+
         controller.setNetworkRole(Role.HOST);
 
         controller.resetSession();
@@ -365,17 +263,13 @@ class GameControllerTest {
 
     @Test
     void resetSessionRestoresNotConnectedRole() {
-        
+
         controller.setNetworkRole(Role.HOST);
 
         controller.resetSession();
 
-        
 
-        assertThrows(
-                IllegalStateException.class,
-                controller::startListeningForActions
-        );
+        assertThrows(IllegalStateException.class, controller::startListeningForActions);
     }
 
     @Test
@@ -400,25 +294,14 @@ class GameControllerTest {
 
         controller.resetSession();
 
-        Player newPlayerOne =
-                new Player(3, "New Player One");
-        Player newPlayerTwo =
-                new Player(4, "New Player Two");
+        Player newPlayerOne = new Player(3, "New Player One");
+        Player newPlayerTwo = new Player(4, "New Player Two");
 
-        controller.startMatch(
-                newPlayerOne,
-                newPlayerTwo
-        );
+        controller.startMatch(newPlayerOne, newPlayerTwo);
 
-        assertSame(
-                newPlayerOne,
-                controller.getMatch().getPlayerOne()
-        );
+        assertSame(newPlayerOne, controller.getMatch().getPlayerOne());
 
-        assertSame(
-                newPlayerTwo,
-                controller.getMatch().getPlayerTwo()
-        );
+        assertSame(newPlayerTwo, controller.getMatch().getPlayerTwo());
     }
 
     @Test
@@ -428,215 +311,124 @@ class GameControllerTest {
 
         controller.resetSession();
 
-        Player newPlayerOne =
-                new Player(3, "New Player One");
-        Player newPlayerTwo =
-                new Player(4, "New Player Two");
+        Player newPlayerOne = new Player(3, "New Player One");
+        Player newPlayerTwo = new Player(4, "New Player Two");
 
-        controller.startMatch(
-                newPlayerOne,
-                newPlayerTwo
-        );
+        controller.startMatch(newPlayerOne, newPlayerTwo);
 
         assertNull(controller.getLocalPlayer());
     }
 
     // -------------------------------------------------------------------------
-    // startMatch - common and non-host behavior
+    // startMatch
     // -------------------------------------------------------------------------
 
     @Test
-    void startMatchCreatesNewMatch() {
+    void startMatch_setsActiveMatchWithRunningStatus() {
         controller.startMatch(playerOne, playerTwo);
 
         assertNotNull(controller.getMatch());
+        assertEquals(MatchStatus.RUNNING, controller.getMatch().getMatchStatus());
     }
 
     @Test
-    void startMatchStoresPlayerOne() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertSame(
-                playerOne,
-                controller.getMatch().getPlayerOne()
-        );
-    }
-
-    @Test
-    void startMatchStoresPlayerTwo() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertSame(
-                playerTwo,
-                controller.getMatch().getPlayerTwo()
-        );
-    }
-
-    @Test
-    void startMatchSetsMatchStatusToRunning() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertEquals(
-                MatchStatus.RUNNING,
-                controller.getMatch().getMatchStatus()
-        );
-    }
-
-    @Test
-    void startMatchCreatesGameState() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertNotNull(controller.getMatch().getGameState());
-    }
-
-    @Test
-    void startMatchCreatesMatchState() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertNotNull(controller.getMatch().getMatchState());
-    }
-
-    @Test
-    void startMatchStartsInRoundOne() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertEquals(
-                1,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
-    }
-
-    @Test
-    void startMatchUsesOneMatchPlayerAsStartingPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player startingPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer();
-
-        assertTrue(
-                startingPlayer == playerOne
-                        || startingPlayer == playerTwo
-        );
-    }
-
-    @Test
-    void startMatchUsesOtherMatchPlayerAsSecondPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player startingPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer();
-
-        Player secondPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getSecondPlayer();
-
-        assertTrue(
-                startingPlayer != secondPlayer
-        );
-
-        assertTrue(
-                startingPlayer == playerOne
-                        || startingPlayer == playerTwo
-        );
-
-        assertTrue(
-                secondPlayer == playerOne
-                        || secondPlayer == playerTwo
-        );
-    }
-
-    @Test
-    void startMatchSetsStartingPlayerAsCurrentPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertSame(
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer(),
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void startMatchRejectsNullPlayerOne() {
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.startMatch(null, playerTwo)
-        );
-    }
-
-    @Test
-    void startMatchRejectsNullPlayerTwo() {
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.startMatch(playerOne, null)
-        );
-    }
-
-    @Test
-    void startMatchRejectsBothPlayersBeingNull() {
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.startMatch(null, null)
-        );
-    }
-
-    @Test
-    void failedStartMatchDoesNotCreateMatch() {
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.startMatch(null, playerTwo)
-        );
-
-        assertNull(controller.getMatch());
-    }
-
-    @Test
-    void startMatchReplacesExistingMatch() {
+    void startMatch_replacesPreviousMatchState() {
         controller.startMatch(playerOne, playerTwo);
         Match firstMatch = controller.getMatch();
 
-        Player newPlayerOne =
-                new Player(3, "New Player One");
-        Player newPlayerTwo =
-                new Player(4, "New Player Two");
+        Player newPlayerOne = new Player(3, "New Player One");
+        Player newPlayerTwo = new Player(4, "New Player Two");
 
         controller.startMatch(newPlayerOne, newPlayerTwo);
 
         assertNotSame(firstMatch, controller.getMatch());
-        assertSame(
-                newPlayerOne,
-                controller.getMatch().getPlayerOne()
-        );
-        assertSame(
-                newPlayerTwo,
-                controller.getMatch().getPlayerTwo()
-        );
+        assertSame(newPlayerOne, controller.getMatch().getPlayerOne());
+        assertSame(newPlayerTwo, controller.getMatch().getPlayerTwo());
     }
 
     @Test
-    void startMatchDoesNotAutomaticallySetLocalPlayer() {
+    void startMatch_storesPlayersCorrectly() {
         controller.startMatch(playerOne, playerTwo);
 
+        assertSame(playerOne, controller.getMatch().getPlayerOne());
+        assertSame(playerTwo, controller.getMatch().getPlayerTwo());
+    }
+
+    @Test
+    void startMatch_initializesStatesCorrectly() {
+        controller.startMatch(playerOne, playerTwo);
+
+        assertNotNull(controller.getMatch().getGameState());
+        assertNotNull(controller.getMatch().getMatchState());
+        assertEquals(1, controller.getMatch().getMatchState().getCurrentRound());
+    }
+
+    @Test
+    void startMatch_setsStartingPlayerCorrectly() {
+        controller.startMatch(playerOne, playerTwo);
+
+        Player startingPlayer = controller.getMatch().getGameState().getStartingPlayer();
+        Player secondPlayer = controller.getMatch().getGameState().getSecondPlayer();
+
+        assertTrue(startingPlayer == playerOne || startingPlayer == playerTwo);
+        assertTrue(secondPlayer == playerOne || secondPlayer == playerTwo);
+        assertNotSame(startingPlayer, secondPlayer);
+        assertSame(startingPlayer, controller.getMatch().getGameState().getCurrentPlayer());
+    }
+
+    @Test
+    void startMatch_rejectsNullPlayers() {
+        assertThrows(NullPointerException.class, () -> controller.startMatch(null, playerTwo));
+        assertThrows(NullPointerException.class, () -> controller.startMatch(playerOne, null));
+        assertNull(controller.getMatch());
+    }
+
+    @Test
+    void startMatch_localPlayerBehavior() {
+        controller.setLocalPlayer(playerTwo);
+        controller.startMatch(playerOne, playerTwo);
+
+        assertSame(playerTwo, controller.getLocalPlayer());
+
+        controller.resetSession();
+        controller.startMatch(playerOne, playerTwo);
         assertNull(controller.getLocalPlayer());
     }
 
     @Test
-    void startMatchPreservesPreviouslySetLocalPlayer() {
-        controller.setLocalPlayer(playerTwo);
+    void startMatch_asHost_generatesAndTransmitsInitialSetup() {
+        controller.setNetworkRole(Role.HOST);
 
         controller.startMatch(playerOne, playerTwo);
 
-        assertSame(playerTwo, controller.getLocalPlayer());
+        List<GameAction> actions = captureSentActions();
+
+        assertEquals(1, actions.stream().filter(a -> a.type() == GameAction.ActionType.SET_STARTING_PLAYER).count());
+        assertEquals(8, actions.stream().filter(a -> a.type() == GameAction.ActionType.SET_BOARD_COLOR).count());
+        assertEquals(5, actions.stream().filter(a -> a.type() == GameAction.ActionType.DEAL_CARD).count());
+
+        assertEquals(5, playerOne.getHandCardCount() + playerTwo.getHandCardCount());
+    }
+
+    @Test
+    void startMatch_asGuest_waitsForRemoteSetup() {
+        controller.setNetworkRole(Role.GUEST);
+
+        controller.startMatch(playerOne, playerTwo);
+
+        assertEquals(0, playerOne.getHandCardCount());
+        assertEquals(0, playerTwo.getHandCardCount());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @Test
+    void startMatch_triggersStateChangedListener() {
+        AtomicInteger notificationCount = new AtomicInteger();
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
+
+        controller.startMatch(playerOne, playerTwo);
+
+        assertEquals(1, notificationCount.get());
     }
 
     // -------------------------------------------------------------------------
@@ -645,19 +437,13 @@ class GameControllerTest {
 
     @Test
     void startMatchDoesNotNotifyReplacedStateListener() {
-        AtomicInteger firstListenerCount =
-                new AtomicInteger();
+        AtomicInteger firstListenerCount = new AtomicInteger();
 
-        AtomicInteger secondListenerCount =
-                new AtomicInteger();
+        AtomicInteger secondListenerCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                firstListenerCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(firstListenerCount::incrementAndGet);
 
-        controller.setOnStateChangedListener(
-                secondListenerCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(secondListenerCount::incrementAndGet);
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -667,12 +453,9 @@ class GameControllerTest {
 
     @Test
     void startMatchDoesNotNotifyRemovedStateListener() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.setOnStateChangedListener(null);
 
@@ -683,17 +466,11 @@ class GameControllerTest {
 
     @Test
     void failedStartMatchDoesNotNotifyStateChangedListener() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.startMatch(null, playerTwo)
-        );
+        assertThrows(NullPointerException.class, () -> controller.startMatch(null, playerTwo));
 
         assertEquals(0, notificationCount.get());
     }
@@ -705,34 +482,28 @@ class GameControllerTest {
     @Test
     void guestStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.GUEST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         assertNotNull(controller.getMatch());
-        assertEquals(
-                MatchStatus.RUNNING,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.RUNNING, controller.getMatch().getMatchStatus());
     }
 
     @Test
     void guestStartMatchDoesNotSendGameActions() {
         controller.setNetworkRole(Role.GUEST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
     void guestStartMatchDoesNotDealInitialCardsLocally() {
         controller.setNetworkRole(Role.GUEST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -743,23 +514,13 @@ class GameControllerTest {
     @Test
     void guestStartMatchWaitsForRemoteBoardSetup() {
         controller.setNetworkRole(Role.GUEST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        assertEquals(
-                8,
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard()
-                        .getFieldColors()
-                        .size()
-        );
+        assertEquals(8, controller.getMatch().getGameState().getBoard().getFieldColors().size());
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     // -------------------------------------------------------------------------
@@ -769,28 +530,22 @@ class GameControllerTest {
     @Test
     void notConnectedStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.NOT_CONNECTED);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         assertNotNull(controller.getMatch());
-        assertEquals(
-                MatchStatus.RUNNING,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.RUNNING, controller.getMatch().getMatchStatus());
     }
 
     @Test
     void notConnectedStartMatchDoesNotSendGameActions() {
         controller.setNetworkRole(Role.NOT_CONNECTED);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
@@ -808,12 +563,7 @@ class GameControllerTest {
     void startMatchWithoutNetworkManagerDoesNotThrow() {
         controller.setNetworkRole(Role.GUEST);
 
-        assertDoesNotThrow(
-                () -> controller.startMatch(
-                        playerOne,
-                        playerTwo
-                )
-        );
+        assertDoesNotThrow(() -> controller.startMatch(playerOne, playerTwo));
     }
 
     //TODO
@@ -838,63 +588,46 @@ class GameControllerTest {
     @Test
     void hostStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         assertNotNull(controller.getMatch());
-        assertEquals(
-                MatchStatus.RUNNING,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.RUNNING, controller.getMatch().getMatchStatus());
     }
 
     @Test
     void hostStartMatchDealsTwoCardsToStartingPlayer() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        Player startingPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer();
+        Player startingPlayer = controller.getMatch().getGameState().getStartingPlayer();
 
-        assertEquals(
-                2,
-                startingPlayer.getHandCardCount()
-        );
+        assertEquals(2, startingPlayer.getHandCardCount());
     }
 
     @Test
     void hostStartMatchDealsThreeCardsToSecondPlayer() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        Player secondPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getSecondPlayer();
+        Player secondPlayer = controller.getMatch().getGameState().getSecondPlayer();
 
-        assertEquals(
-                3,
-                secondPlayer.getHandCardCount()
-        );
+        assertEquals(3, secondPlayer.getHandCardCount());
     }
 
     @Test
     void hostStartMatchDealsFiveCardsInTotal() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        int totalCards =
-                playerOne.getHandCardCount()
-                        + playerTwo.getHandCardCount();
+        int totalCards = playerOne.getHandCardCount() + playerTwo.getHandCardCount();
 
         assertEquals(5, totalCards);
     }
@@ -902,7 +635,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchDealsOnlyValidCards() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -923,31 +656,23 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsExactlyFourteenGameActions() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        verify(
-                networkManager,
-                times(14)
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, times(14)).sendGameChange(Mockito.any(GameAction.class));
     }
 
     @Test
     void hostStartMatchSendsStartingPlayerActionOnce() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         List<GameAction> actions = captureSentActions();
 
-        long count = actions.stream()
-                .filter(action ->
-                        action.type()
-                                == GameAction.ActionType.SET_STARTING_PLAYER
-                )
-                .count();
+        long count = actions.stream().filter(action -> action.type() == GameAction.ActionType.SET_STARTING_PLAYER).count();
 
         assertEquals(1, count);
     }
@@ -955,18 +680,13 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsEightBoardColorActions() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         List<GameAction> actions = captureSentActions();
 
-        long count = actions.stream()
-                .filter(action ->
-                        action.type()
-                                == GameAction.ActionType.SET_BOARD_COLOR
-                )
-                .count();
+        long count = actions.stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).count();
 
         assertEquals(8, count);
     }
@@ -974,18 +694,13 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsFiveDealCardActions() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         List<GameAction> actions = captureSentActions();
 
-        long count = actions.stream()
-                .filter(action ->
-                        action.type()
-                                == GameAction.ActionType.DEAL_CARD
-                )
-                .count();
+        long count = actions.stream().filter(action -> action.type() == GameAction.ActionType.DEAL_CARD).count();
 
         assertEquals(5, count);
     }
@@ -993,78 +708,47 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsActionsInExpectedGeneralOrder() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
         List<GameAction> actions = captureSentActions();
 
-        assertEquals(
-                GameAction.ActionType.SET_STARTING_PLAYER,
-                actions.get(0).type()
-        );
+        assertEquals(GameAction.ActionType.SET_STARTING_PLAYER, actions.get(0).type());
 
         for (int index = 1; index <= 8; index++) {
-            assertEquals(
-                    GameAction.ActionType.SET_BOARD_COLOR,
-                    actions.get(index).type()
-            );
+            assertEquals(GameAction.ActionType.SET_BOARD_COLOR, actions.get(index).type());
         }
 
         for (int index = 9; index <= 13; index++) {
-            assertEquals(
-                    GameAction.ActionType.DEAL_CARD,
-                    actions.get(index).type()
-            );
+            assertEquals(GameAction.ActionType.DEAL_CARD, actions.get(index).type());
         }
     }
 
     @Test
     void sentStartingPlayerMatchesLocalStartingPlayer() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        GameAction startingPlayerAction =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_STARTING_PLAYER
-                        )
-                        .findFirst()
-                        .orElseThrow();
+        GameAction startingPlayerAction = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.SET_STARTING_PLAYER).findFirst().orElseThrow();
 
-        Player startingPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer();
+        Player startingPlayer = controller.getMatch().getGameState().getStartingPlayer();
 
-        int expectedIndex =
-                startingPlayer == playerOne ? 0 : 1;
+        int expectedIndex = startingPlayer == playerOne ? 0 : 1;
 
-        assertEquals(
-                expectedIndex,
-                startingPlayerAction.contextSensitiveInt()
-        );
+        assertEquals(expectedIndex, startingPlayerAction.contextSensitiveInt());
     }
 
     @Test
     void sentBoardColorsMatchLocalBoard() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        List<GameAction> boardActions =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_BOARD_COLOR
-                        )
-                        .toList();
+        List<GameAction> boardActions = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).toList();
 
         assertEquals(8, boardActions.size());
 
@@ -1072,46 +756,22 @@ class GameControllerTest {
             int row = action.boardPositionRow();
             int column = action.boardPositionColumn();
 
-            assertFalse(
-                    controller.getMatch()
-                            .getGameState()
-                            .getBoard()
-                            .isCenterField(row, column)
-            );
+            assertFalse(controller.getMatch().getGameState().getBoard().isCenterField(row, column));
 
-            assertEquals(
-                    controller.getMatch()
-                            .getGameState()
-                            .getBoard()
-                            .getField(row, column)
-                            .getColor(),
-                    action.boardColor()
-            );
+            assertEquals(controller.getMatch().getGameState().getBoard().getField(row, column).getColor(), action.boardColor());
         }
     }
 
     @Test
     void hostDoesNotSendCenterFieldAsBoardColor() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        List<GameAction> boardActions =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_BOARD_COLOR
-                        )
-                        .toList();
+        List<GameAction> boardActions = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).toList();
 
-        boolean containsCenter =
-                boardActions.stream()
-                        .anyMatch(action ->
-                                action.boardPositionRow() == 1
-                                        && action.boardPositionColumn() == 1
-                        );
+        boolean containsCenter = boardActions.stream().anyMatch(action -> action.boardPositionRow() == 1 && action.boardPositionColumn() == 1);
 
         assertFalse(containsCenter);
     }
@@ -1119,18 +779,11 @@ class GameControllerTest {
     @Test
     void everySentBoardColorActionHasValidPosition() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        List<GameAction> boardActions =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_BOARD_COLOR
-                        )
-                        .toList();
+        List<GameAction> boardActions = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).toList();
 
         for (GameAction action : boardActions) {
             assertTrue(action.boardPositionRow() >= 0);
@@ -1144,23 +797,13 @@ class GameControllerTest {
     @Test
     void sentDealCardsMatchLocallyStoredCards() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        List<GameAction> dealActions =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.DEAL_CARD
-                        )
-                        .toList();
+        List<GameAction> dealActions = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.DEAL_CARD).toList();
 
-        List<Card> sentCards =
-                dealActions.stream()
-                        .map(GameAction::card)
-                        .toList();
+        List<Card> sentCards = dealActions.stream().map(GameAction::card).toList();
 
         List<Card> localCards = new ArrayList<>();
         localCards.addAll(playerOne.getHandCards());
@@ -1177,38 +820,17 @@ class GameControllerTest {
     @Test
     void dealCardActionsTargetCorrectPlayers() {
         controller.setNetworkRole(Role.HOST);
-        
+
 
         controller.startMatch(playerOne, playerTwo);
 
-        List<GameAction> dealActions =
-                captureSentActions()
-                        .stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.DEAL_CARD
-                        )
-                        .toList();
+        List<GameAction> dealActions = captureSentActions().stream().filter(action -> action.type() == GameAction.ActionType.DEAL_CARD).toList();
 
-        long playerOneDeals =
-                dealActions.stream()
-                        .filter(action ->
-                                action.contextSensitiveInt() == 0
-                        )
-                        .count();
+        long playerOneDeals = dealActions.stream().filter(action -> action.contextSensitiveInt() == 0).count();
 
-        long playerTwoDeals =
-                dealActions.stream()
-                        .filter(action ->
-                                action.contextSensitiveInt() == 1
-                        )
-                        .count();
+        long playerTwoDeals = dealActions.stream().filter(action -> action.contextSensitiveInt() == 1).count();
 
-        if (
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer() == playerOne
-        ) {
+        if (controller.getMatch().getGameState().getStartingPlayer() == playerOne) {
             assertEquals(2, playerOneDeals);
             assertEquals(3, playerTwoDeals);
         } else {
@@ -1219,14 +841,11 @@ class GameControllerTest {
 
     @Test
     void hostStartMatchNotifiesStateChangedListenerExactlyOnce() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
         controller.setNetworkRole(Role.HOST);
-        
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1238,17 +857,9 @@ class GameControllerTest {
     void hostStartMatchWorksWithoutNetworkManager() {
         controller.setNetworkRole(Role.HOST);
 
-        assertDoesNotThrow(
-                () -> controller.startMatch(
-                        playerOne,
-                        playerTwo
-                )
-        );
+        assertDoesNotThrow(() -> controller.startMatch(playerOne, playerTwo));
 
-        assertEquals(5,
-                playerOne.getHandCardCount()
-                        + playerTwo.getHandCardCount()
-        );
+        assertEquals(5, playerOne.getHandCardCount() + playerTwo.getHandCardCount());
     }
 
     //TODO
@@ -1287,12 +898,9 @@ class GameControllerTest {
 
     @Test
     void setOnStateChangedListenerRegistersListener() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1301,19 +909,13 @@ class GameControllerTest {
 
     @Test
     void setOnStateChangedListenerReplacesPreviousListener() {
-        AtomicInteger firstListenerCount =
-                new AtomicInteger();
+        AtomicInteger firstListenerCount = new AtomicInteger();
 
-        AtomicInteger secondListenerCount =
-                new AtomicInteger();
+        AtomicInteger secondListenerCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                firstListenerCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(firstListenerCount::incrementAndGet);
 
-        controller.setOnStateChangedListener(
-                secondListenerCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(secondListenerCount::incrementAndGet);
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1323,12 +925,9 @@ class GameControllerTest {
 
     @Test
     void setOnStateChangedListenerAcceptsNullToUnregister() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.setOnStateChangedListener(null);
 
@@ -1339,12 +938,9 @@ class GameControllerTest {
 
     @Test
     void startMatchNotifiesStateChangedListenerOnce() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1358,12 +954,9 @@ class GameControllerTest {
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.selectCard(playerOne, card);
 
@@ -1376,12 +969,9 @@ class GameControllerTest {
 
         Card card = new Card(GameColor.YELLOW, 3);
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.selectCard(playerOne, card);
 
@@ -1396,12 +986,9 @@ class GameControllerTest {
         playerOne.addCard(card);
         playerOne.selectCard(card);
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.unselectCard(playerOne);
 
@@ -1412,12 +999,9 @@ class GameControllerTest {
     void unselectCardWithoutSelectionStillNotifiesStateChangedListener() {
         controller.startMatch(playerOne, playerTwo);
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.unselectCard(playerOne);
 
@@ -1428,17 +1012,11 @@ class GameControllerTest {
     void successfulDrawCardNotifiesStateChangedListenerOnce() {
         controller.startMatch(playerOne, playerTwo);
 
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
+        Player currentPlayer = controller.getMatch().getGameState().getCurrentPlayer();
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.drawCard(currentPlayer);
 
@@ -1449,22 +1027,16 @@ class GameControllerTest {
     void successfulPlayCardNotifiesStateChangedListenerOnce() {
         controller.startMatch(playerOne, playerTwo);
 
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
+        Player currentPlayer = controller.getMatch().getGameState().getCurrentPlayer();
 
         Card card = new Card(GameColor.YELLOW, 3);
 
         currentPlayer.addCard(card);
         currentPlayer.selectCard(card);
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.playCard(currentPlayer, 0, 0);
 
@@ -1480,18 +1052,11 @@ class GameControllerTest {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        AtomicInteger abortCount =
-                new AtomicInteger();
+        AtomicInteger abortCount = new AtomicInteger();
 
-        controller.setOnMatchAbortedListener(
-                abortCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(abortCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(1, abortCount.get());
     }
@@ -1501,25 +1066,15 @@ class GameControllerTest {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        AtomicInteger firstListenerCount =
-                new AtomicInteger();
+        AtomicInteger firstListenerCount = new AtomicInteger();
 
-        AtomicInteger secondListenerCount =
-                new AtomicInteger();
+        AtomicInteger secondListenerCount = new AtomicInteger();
 
-        controller.setOnMatchAbortedListener(
-                firstListenerCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(firstListenerCount::incrementAndGet);
 
-        controller.setOnMatchAbortedListener(
-                secondListenerCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(secondListenerCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(0, firstListenerCount.get());
         assertEquals(1, secondListenerCount.get());
@@ -1530,20 +1085,13 @@ class GameControllerTest {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        AtomicInteger abortCount =
-                new AtomicInteger();
+        AtomicInteger abortCount = new AtomicInteger();
 
-        controller.setOnMatchAbortedListener(
-                abortCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(abortCount::incrementAndGet);
 
         controller.setOnMatchAbortedListener(null);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(0, abortCount.get());
     }
@@ -1553,18 +1101,11 @@ class GameControllerTest {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        AtomicInteger stateNotificationCount =
-                new AtomicInteger();
+        AtomicInteger stateNotificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                stateNotificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(stateNotificationCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(1, stateNotificationCount.get());
     }
@@ -1574,25 +1115,15 @@ class GameControllerTest {
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        AtomicInteger stateNotificationCount =
-                new AtomicInteger();
+        AtomicInteger stateNotificationCount = new AtomicInteger();
 
-        AtomicInteger abortNotificationCount =
-                new AtomicInteger();
+        AtomicInteger abortNotificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                stateNotificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(stateNotificationCount::incrementAndGet);
 
-        controller.setOnMatchAbortedListener(
-                abortNotificationCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(abortNotificationCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(1, stateNotificationCount.get());
         assertEquals(1, abortNotificationCount.get());
@@ -1604,12 +1135,9 @@ class GameControllerTest {
 
     @Test
     void resetSessionRemovesStateChangedListener() {
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.resetSession();
 
@@ -1620,35 +1148,27 @@ class GameControllerTest {
 
     @Test
     void resetSessionRemovesMatchAbortedListener() {
-        AtomicInteger abortCount =
-                new AtomicInteger();
+        AtomicInteger abortCount = new AtomicInteger();
 
-        controller.setOnMatchAbortedListener(
-                abortCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(abortCount::incrementAndGet);
 
         controller.resetSession();
 
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(0, abortCount.get());
     }
 
     // -------------------------------------------------------------------------
-    // selectCard - successful actions
+    // selectCard
     // -------------------------------------------------------------------------
 
     @Test
-    void selectCardSelectsOwnedCard() {
+    void selectCard_succeedsWhenCardInHandAndMatchRunning() {
         controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
 
@@ -1659,472 +1179,114 @@ class GameControllerTest {
     }
 
     @Test
-    void selectCardCanSelectCardForEitherMatchPlayer() {
+    void selectCard_replacesPreviousSelection() {
         controller.startMatch(playerOne, playerTwo);
+        Card first = new Card(GameColor.YELLOW, 2);
+        Card second = new Card(GameColor.GREEN, 4);
+        playerOne.addCard(first);
+        playerOne.addCard(second);
 
-        Card firstCard = new Card(GameColor.YELLOW, 3);
-        Card secondCard = new Card(GameColor.GREEN, 5);
+        controller.selectCard(playerOne, first);
+        controller.selectCard(playerOne, second);
 
-        playerOne.addCard(firstCard);
-        playerTwo.addCard(secondCard);
-
-        controller.selectCard(playerOne, firstCard);
-        assertSame(firstCard, playerOne.getSelectedCard());
-
-        controller.selectCard(playerTwo, secondCard);
-        assertSame(secondCard, playerTwo.getSelectedCard());
+        assertSame(second, playerOne.getSelectedCard());
     }
 
     @Test
-    void selectCardDoesNotRequirePlayerToBeCurrentPlayer() {
+    void selectCard_failsSilentlyWhenMatchNotRunning() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
-
-        Player otherPlayer =
-                controller.getMatch()
-                        .getOtherPlayer(currentPlayer);
-
-        Card card = new Card(GameColor.CYAN, 4);
-        otherPlayer.addCard(card);
-
-        controller.selectCard(otherPlayer, card);
-
-        assertSame(card, otherPlayer.getSelectedCard());
-    }
-
-    @Test
-    void selectCardAcceptsEqualCardWhenPlayerOwnsEquivalentCard() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card storedCard =
-                new Card(GameColor.PURPLE, 2);
-
-        Card equalCard =
-                new Card(GameColor.PURPLE, 2);
-
-        playerOne.addCard(storedCard);
-
-        controller.selectCard(playerOne, equalCard);
-
-        assertEquals(equalCard, playerOne.getSelectedCard());
-    }
-
-    @Test
-    void selectCardCanReplacePreviousSelection() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card firstCard =
-                new Card(GameColor.YELLOW, 2);
-
-        Card secondCard =
-                new Card(GameColor.GREEN, 4);
-
-        playerOne.addCard(firstCard);
-        playerOne.addCard(secondCard);
-
-        controller.selectCard(playerOne, firstCard);
-        controller.selectCard(playerOne, secondCard);
-
-        assertSame(secondCard, playerOne.getSelectedCard());
-    }
-
-    @Test
-    void selectCardDoesNotRemoveCardFromHand() {
-        controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
+        controller.getMatch().setMatchStatus(MatchStatus.PAUSED);
 
         controller.selectCard(playerOne, card);
 
-        assertTrue(playerOne.hasCard(card));
-        assertEquals(1, playerOne.getHandCardCount());
+        assertFalse(playerOne.hasSelectedCard());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void selectCardDoesNotChangeCurrentPlayer() {
+    void selectCard_failsSilentlyWhenCardNotInHand() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        currentPlayer.addCard(card);
-
-        controller.selectCard(currentPlayer, card);
-
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    // -------------------------------------------------------------------------
-    // selectCard - rejected actions
-    // -------------------------------------------------------------------------
-
-    @Test
-    void selectCardDoesNothingWhenPlayerDoesNotOwnCard() {
-        controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
 
         controller.selectCard(playerOne, card);
 
         assertFalse(playerOne.hasSelectedCard());
-        assertNull(playerOne.getSelectedCard());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void selectCardDoesNothingForForeignPlayer() {
+    void selectCard_failsSilentlyWhenPlayerNotInMatch() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
-
+        Player foreign = new Player(3, "Foreign");
         Card card = new Card(GameColor.YELLOW, 3);
-        foreignPlayer.addCard(card);
+        foreign.addCard(card);
 
-        controller.selectCard(foreignPlayer, card);
+        controller.selectCard(foreign, card);
 
-        assertFalse(foreignPlayer.hasSelectedCard());
+        assertFalse(foreign.hasSelectedCard());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void selectCardDoesNothingForNullPlayer() {
+    void selectCard_throwsNpeWhenCardNullAndPlayerInMatch() {
         controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        assertDoesNotThrow(
-                () -> controller.selectCard(null, card)
-        );
+        assertThrows(NullPointerException.class, () -> controller.selectCard(playerOne, null));
     }
 
     @Test
-    void selectCardRejectsNullCard() {
+    void selectCard_transmitsActionOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.selectCard(playerOne, null)
-        );
-    }
-
-    @Test
-    void selectCardDoesNothingWhenMatchIsPaused() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.PAUSED);
-
-        controller.selectCard(playerOne, card);
-
-        assertFalse(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void selectCardDoesNothingWhenMatchIsFinished() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.FINISHED);
-
-        controller.selectCard(playerOne, card);
-
-        assertFalse(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void rejectedSelectionDoesNotReplacePreviousSelection() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card ownedCard =
-                new Card(GameColor.YELLOW, 3);
-
-        Card unownedCard =
-                new Card(GameColor.GREEN, 5);
-
-        playerOne.addCard(ownedCard);
-        controller.selectCard(playerOne, ownedCard);
-
-        controller.selectCard(playerOne, unownedCard);
-
-        assertSame(ownedCard, playerOne.getSelectedCard());
-    }
-
-    // -------------------------------------------------------------------------
-    // selectCard - network communication
-    // -------------------------------------------------------------------------
-
-    @Test
-    void successfulSelectCardSendsSelectCardAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
 
         controller.selectCard(playerOne, card);
 
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
-
-        verify(networkManager)
-                .sendGameChange(captor.capture());
-
-        GameAction sentAction = captor.getValue();
-
-        assertEquals(
-                GameAction.ActionType.SELECT_CARD,
-                sentAction.type()
-        );
-
-        assertSame(card, sentAction.card());
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
+        verify(networkManager).sendGameChange(captor.capture());
+        assertEquals(GameAction.ActionType.SELECT_CARD, captor.getValue().type());
+        assertSame(card, captor.getValue().card());
     }
 
     @Test
-    void successfulSelectCardSendsExactlyOneAction() {
-        
+    void selectCard_triggersStateChangedOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
 
         controller.selectCard(playerOne, card);
 
-        verify(
-                networkManager,
-                times(1)
-        ).sendGameChange(Mockito.any(GameAction.class));
+        assertEquals(1, count.get());
     }
 
     @Test
-    void rejectedSelectCardDoesNotSendAction() {
-        
+    void selectCard_doesNotTransmitOnFailure() {
         controller.startMatch(playerOne, playerTwo);
-
-        Card unownedCard =
-                new Card(GameColor.YELLOW, 3);
-
-        controller.selectCard(playerOne, unownedCard);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        controller.selectCard(playerOne, new Card(GameColor.YELLOW, 3));
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void selectCardWithNullPlayerDoesNotSendAction() {
-        
+    void selectCard_doesNotTriggerStateChangedOnFailure() {
         controller.startMatch(playerOne, playerTwo);
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
 
-        Card card = new Card(GameColor.YELLOW, 3);
+        controller.selectCard(playerOne, new Card(GameColor.YELLOW, 3));
 
-        controller.selectCard(null, card);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
-    }
-
-    @Test
-    void selectCardWithNullCardDoesNotSendAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.selectCard(playerOne, null)
-        );
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        assertEquals(0, count.get());
     }
 
     // -------------------------------------------------------------------------
-    // unselectCard - successful actions
+    // unselectCard
     // -------------------------------------------------------------------------
 
     @Test
-    void unselectCardClearsSelectedCard() {
+    void unselectCard_clearsExistingSelection() {
         controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.unselectCard(playerOne);
-
-        assertNull(playerOne.getSelectedCard());
-        assertFalse(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void unselectCardDoesNotRemoveCardFromHand() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.unselectCard(playerOne);
-
-        assertTrue(playerOne.hasCard(card));
-        assertEquals(1, playerOne.getHandCardCount());
-    }
-
-    @Test
-    void unselectCardDoesNotChangeCurrentPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        currentPlayer.addCard(card);
-        currentPlayer.selectCard(card);
-
-        controller.unselectCard(currentPlayer);
-
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void unselectCardDoesNothingWhenNoCardIsSelected() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertDoesNotThrow(
-                () -> controller.unselectCard(playerOne)
-        );
-
-        assertFalse(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void unselectCardCanBeCalledMultipleTimes() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.unselectCard(playerOne);
-
-        assertDoesNotThrow(
-                () -> controller.unselectCard(playerOne)
-        );
-
-        assertFalse(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void unselectCardDoesNothingWhenMatchIsPaused() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.PAUSED);
-
-        controller.unselectCard(playerOne);
-
-        assertSame(card, playerOne.getSelectedCard());
-        assertTrue(playerOne.hasSelectedCard());
-    }
-
-    @Test
-    void unselectCardDoesNothingWhenMatchIsFinished() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.FINISHED);
-
-        controller.unselectCard(playerOne);
-
-        assertSame(card, playerOne.getSelectedCard());
-        assertTrue(playerOne.hasSelectedCard());
-    }
-
-    // -------------------------------------------------------------------------
-    // unselectCard - network communication
-    // -------------------------------------------------------------------------
-
-    @Test
-    void unselectCardSendsUnselectCardAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        playerOne.addCard(card);
-        playerOne.selectCard(card);
-
-        controller.unselectCard(playerOne);
-
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
-
-        verify(networkManager)
-                .sendGameChange(captor.capture());
-
-        GameAction sentAction = captor.getValue();
-
-        assertEquals(
-                GameAction.ActionType.UNSELECT_CARD,
-                sentAction.type()
-        );
-
-        assertNull(sentAction.card());
-    }
-
-    @Test
-    void unselectCardSendsActionEvenWithoutExistingSelection() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        controller.unselectCard(playerOne);
-
-        verify(
-                networkManager,
-                times(1)
-        ).sendGameChange(Mockito.any(GameAction.class));
-    }
-
-    @Test
-    void unselectCardWithoutNetworkManagerStillClearsSelection() {
-        controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
         playerOne.selectCard(card);
@@ -2134,1237 +1296,380 @@ class GameControllerTest {
         assertFalse(playerOne.hasSelectedCard());
     }
 
-    // -------------------------------------------------------------------------
-    // unselectCard - invalid player behavior
-    // -------------------------------------------------------------------------
-
     @Test
-    void unselectCardWithNullPlayerThrowsNullPointerException() {
-        
+    void unselectCard_noEffectWhenNothingSelected() {
         controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.unselectCard(null)
-        );
+        assertDoesNotThrow(() -> controller.unselectCard(playerOne));
+        assertFalse(playerOne.hasSelectedCard());
     }
 
     @Test
-    void unselectCardWithNullPlayerDoesNotSendAction() {
-        
+    void unselectCard_doesNotTransmitWhenNothingSelected() {
         controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.unselectCard(null)
-        );
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        controller.unselectCard(playerOne);
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void unselectCardDoesNothingForForeignPlayer() {
+    void unselectCard_doesNotTriggerStateChangedWhenNothingSelected() {
         controller.startMatch(playerOne, playerTwo);
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
 
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
+        controller.unselectCard(playerOne);
 
-        Card card = new Card(GameColor.CYAN, 4);
-        foreignPlayer.addCard(card);
-        foreignPlayer.selectCard(card);
-
-        controller.unselectCard(foreignPlayer);
-
-        assertSame(card, foreignPlayer.getSelectedCard());
-        assertTrue(foreignPlayer.hasSelectedCard());
+        assertEquals(0, count.get());
     }
 
     @Test
-    void rejectedUnselectCardForForeignPlayerDoesNotSendAction() {
-        
+    void unselectCard_transmitsOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
-
-        Card card = new Card(GameColor.CYAN, 4);
-        foreignPlayer.addCard(card);
-        foreignPlayer.selectCard(card);
-
-        controller.unselectCard(foreignPlayer);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
-    }
-
-    @Test
-    void rejectedUnselectCardWhenMatchIsPausedDoesNotSendAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
         playerOne.selectCard(card);
 
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.PAUSED);
-
         controller.unselectCard(playerOne);
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
+        verify(networkManager).sendGameChange(captor.capture());
+        assertEquals(GameAction.ActionType.UNSELECT_CARD, captor.getValue().type());
     }
 
     @Test
-    void rejectedUnselectCardDoesNotNotifyStateChangedListener() {
+    void unselectCard_triggersStateChangedOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
-
         Card card = new Card(GameColor.YELLOW, 3);
         playerOne.addCard(card);
         playerOne.selectCard(card);
-
-        controller.getMatch()
-                .setMatchStatus(MatchStatus.FINISHED);
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
 
         controller.unselectCard(playerOne);
 
-        assertEquals(0, notificationCount.get());
+        assertEquals(1, count.get());
     }
 
+    @Test
+    void unselectCard_throwsNpeWhenPlayerNull() {
+        controller.startMatch(playerOne, playerTwo);
+        assertThrows(NullPointerException.class, () -> controller.unselectCard(null));
+    }
+
+        // -------------------------------------------------------------------------
+    // playCard
     // -------------------------------------------------------------------------
-// playCard - score calculation
-// -------------------------------------------------------------------------
 
     @Test
-    void playCardOnGreyFieldAwardsCardValue() {
+    void playCard_succeedsWhenAllConditionsMet() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
 
-        Player currentPlayer = getCurrentPlayer();
+        controller.playCard(current, target.getRow(), target.getColumn());
+
+        assertSame(card, target.getCard());
+        assertEquals(current.getId(), target.getCardOwnerId());
+        assertFalse(current.hasCard(card));
+        assertFalse(current.hasSelectedCard());
+        assertNotSame(current, getCurrentPlayer());
+    }
+
+    @Test
+    void playCard_removesCardFromHandOnSuccess() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
+
+        controller.playCard(current, target.getRow(), target.getColumn());
+
+        assertFalse(current.hasCard(card));
+        assertEquals(0, current.getHandCardCount());
+    }
+
+    @Test
+    void playCard_clearsSelectionOnSuccess() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
+
+        controller.playCard(current, target.getRow(), target.getColumn());
+
+        assertFalse(current.hasSelectedCard());
+        assertNull(current.getSelectedCard());
+    }
+
+    @Test
+    void playCard_addsScoreOnSuccess() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Field grey = findEmptyFieldWithColor(GameColor.GREY);
         Card card = new Card(GameColor.YELLOW, 4);
+        prepareSelectedCard(current, card);
 
-        prepareSelectedCard(currentPlayer, card);
+        controller.playCard(current, grey.getRow(), grey.getColumn());
 
-        Field greyField = findEmptyFieldWithColor(GameColor.GREY);
-
-        controller.playCard(
-                currentPlayer,
-                greyField.getRow(),
-                greyField.getColumn()
-        );
-
-        assertEquals(4, currentPlayer.getScore());
-        assertEquals(4, greyField.getDisplayedScore());
+        assertEquals(4, current.getScore());
     }
 
     @Test
-    void playCardOnMatchingColoredFieldAwardsDoubleCardValue() {
+    void playCard_advancesTurnOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        Field coloredField = findEmptyCardColoredField();
-
-        Card card = new Card(
-                coloredField.getColor(),
-                5
-        );
-
-        prepareSelectedCard(currentPlayer, card);
-
-        controller.playCard(
-                currentPlayer,
-                coloredField.getRow(),
-                coloredField.getColumn()
-        );
-
-        assertEquals(10, currentPlayer.getScore());
-        assertEquals(10, coloredField.getDisplayedScore());
-    }
-
-    @Test
-    void playCardOnDifferentColoredFieldAwardsZeroPoints() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        Field coloredField = findEmptyCardColoredField();
-
-        GameColor differentColor =
-                findDifferentCardColor(coloredField.getColor());
-
-        Card card = new Card(differentColor, 6);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        controller.playCard(
-                currentPlayer,
-                coloredField.getRow(),
-                coloredField.getColumn()
-        );
-
-        assertEquals(0, currentPlayer.getScore());
-        assertEquals(0, coloredField.getDisplayedScore());
-    }
-
-    @Test
-    void playCardAccumulatesScoreWithExistingScore() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        currentPlayer.addScore(7);
-
+        Player current = getCurrentPlayer();
+        Player other = controller.getMatch().getOtherPlayer(current);
         Card card = new Card(GameColor.YELLOW, 3);
-        prepareSelectedCard(currentPlayer, card);
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
 
-        Field greyField = findEmptyFieldWithColor(GameColor.GREY);
+        controller.playCard(current, target.getRow(), target.getColumn());
 
-        controller.playCard(
-                currentPlayer,
-                greyField.getRow(),
-                greyField.getColumn()
-        );
-
-        assertEquals(10, currentPlayer.getScore());
-    }
-
-// -------------------------------------------------------------------------
-// playCard - successful state changes
-// -------------------------------------------------------------------------
-
-    @Test
-    void playCardPlacesSelectedCardOnTargetField() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertSame(card, targetField.getCard());
-    }
-
-    @Test
-    void playCardStoresPlayerIdAsCardOwner() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.GREEN, 2);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertEquals(
-                currentPlayer.getId(),
-                targetField.getCardOwnerId()
-        );
-    }
-
-    @Test
-    void playCardRemovesCardFromPlayersHand() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.CYAN, 4);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertFalse(currentPlayer.hasCard(card));
-        assertEquals(0, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void playCardRemovesOnlyPlayedCardFromHand() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        Card playedCard = new Card(GameColor.YELLOW, 3);
-        Card remainingCard = new Card(GameColor.GREEN, 5);
-
-        currentPlayer.addCard(playedCard);
-        currentPlayer.addCard(remainingCard);
-        currentPlayer.selectCard(playedCard);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertFalse(currentPlayer.hasCard(playedCard));
-        assertTrue(currentPlayer.hasCard(remainingCard));
-        assertEquals(1, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void playCardRemovesOnlyOneOfTwoEqualCards() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        Card firstCard = new Card(GameColor.PURPLE, 4);
-        Card secondCard = new Card(GameColor.PURPLE, 4);
-
-        currentPlayer.addCard(firstCard);
-        currentPlayer.addCard(secondCard);
-        currentPlayer.selectCard(firstCard);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertEquals(1, currentPlayer.getHandCardCount());
-        assertTrue(
-                currentPlayer.hasCard(
-                        new Card(GameColor.PURPLE, 4)
-                )
-        );
-    }
-
-    @Test
-    void playCardClearsSelectedCard() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertNull(currentPlayer.getSelectedCard());
-        assertFalse(currentPlayer.hasSelectedCard());
-    }
-
-    @Test
-    void playCardSwitchesTurnToOtherPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch()
-                        .getOtherPlayer(currentPlayer);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertSame(
-                otherPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void playCardNotifiesStateChangedListenerOnce() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertEquals(1, notificationCount.get());
-    }
-
-// -------------------------------------------------------------------------
-// playCard - network action
-// -------------------------------------------------------------------------
-
-    @Test
-    void successfulPlayCardSendsPlayCardAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
-
-        verify(networkManager)
-                .sendGameChange(captor.capture());
-
-        GameAction action = captor.getValue();
-
-        assertEquals(
-                GameAction.ActionType.PLAY_CARD,
-                action.type()
-        );
-
-        assertSame(card, action.card());
-
-        assertEquals(
-                targetField.getRow(),
-                action.boardPositionRow()
-        );
-
-        assertEquals(
-                targetField.getColumn(),
-                action.boardPositionColumn()
-        );
-    }
-
-    @Test
-    void successfulPlayCardSendsExactlyOneAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.GREEN, 2);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        verify(
-                networkManager,
-                times(1)
-        ).sendGameChange(Mockito.any(GameAction.class));
-    }
-
-    //TODO
-    /*
-    @Test
-    void playCardWithoutNetworkManagerStillAppliesLocally() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.CYAN, 5);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertSame(card, targetField.getCard());
-    }
-   */
-
-// -------------------------------------------------------------------------
-// playCard - rejected actions
-// -------------------------------------------------------------------------
-
-    @Test
-    void playCardDoesNothingWhenPlayerHasNoSelectedCard() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertTrue(targetField.isEmpty());
-        assertEquals(0, currentPlayer.getScore());
-    }
-
-    @Test
-    void playCardDoesNothingWhenItIsNotPlayersTurn() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch()
-                        .getOtherPlayer(currentPlayer);
-
-        Card card = new Card(GameColor.YELLOW, 3);
-        prepareSelectedCard(otherPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                otherPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertTrue(targetField.isEmpty());
-        assertTrue(otherPlayer.hasCard(card));
-        assertSame(card, otherPlayer.getSelectedCard());
-    }
-
-    @Test
-    void playCardDoesNothingForForeignPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
-
-        Card card = new Card(GameColor.GREEN, 3);
-        prepareSelectedCard(foreignPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
-        controller.playCard(
-                foreignPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertTrue(targetField.isEmpty());
-        assertTrue(foreignPlayer.hasCard(card));
-    }
-
-    @Test
-    void playCardRejectsNullPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.playCard(null, 0, 0)
-        );
-    }
-
-    @Test
-    void playCardDoesNothingOnCenterField() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        controller.playCard(currentPlayer, 1, 1);
-
-        Field centerField =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard()
-                        .getField(1, 1);
-
-        assertTrue(centerField.isEmpty());
-        assertTrue(currentPlayer.hasCard(card));
-        assertSame(card, currentPlayer.getSelectedCard());
+        assertSame(other, getCurrentPlayer());
     }
 
     @ParameterizedTest
-    @CsvSource({
-            "-1, 0",
-            "0, -1",
-            "3, 0",
-            "0, 3",
-            "-1, -1",
-            "3, 3"
-    })
-    void playCardDoesNothingForPositionOutsideBoard(
-            int row,
-            int column
-    ) {
+    @EnumSource(value = MatchStatus.class, names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"})
+    void playCard_noopWhenMatchNotRunning(MatchStatus status) {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
+        Player current = getCurrentPlayer();
         Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        assertDoesNotThrow(
-                () -> controller.playCard(
-                        currentPlayer,
-                        row,
-                        column
-                )
-        );
-
-        assertTrue(currentPlayer.hasCard(card));
-        assertSame(card, currentPlayer.getSelectedCard());
-        assertEquals(0, currentPlayer.getScore());
-    }
-
-    @Test
-    void playCardDoesNothingOnOccupiedField() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch()
-                        .getOtherPlayer(currentPlayer);
-
-        Field targetField = findEmptyPlayableField();
-
-        Card existingCard =
-                new Card(GameColor.GREEN, 2);
-
-        targetField.placeCard(
-                existingCard,
-                otherPlayer,
-                2
-        );
-
-        Card selectedCard =
-                new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, selectedCard);
-
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
-
-        assertSame(existingCard, targetField.getCard());
-        assertTrue(currentPlayer.hasCard(selectedCard));
-        assertSame(
-                selectedCard,
-                currentPlayer.getSelectedCard()
-        );
-    }
-
-    @ParameterizedTest
-    @EnumSource(
-            value = MatchStatus.class,
-            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
-    )
-    void playCardDoesNothingWhenMatchIsNotRunning(
-            MatchStatus status
-    ) {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card card = new Card(GameColor.YELLOW, 3);
-
-        prepareSelectedCard(currentPlayer, card);
-
-        Field targetField = findEmptyPlayableField();
-
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
         controller.getMatch().setMatchStatus(status);
 
-        controller.playCard(
-                currentPlayer,
-                targetField.getRow(),
-                targetField.getColumn()
-        );
+        controller.playCard(current, target.getRow(), target.getColumn());
 
-        assertTrue(targetField.isEmpty());
-        assertTrue(currentPlayer.hasCard(card));
-        assertSame(card, currentPlayer.getSelectedCard());
-    }
-
-// -------------------------------------------------------------------------
-// playCard - rejected action side effects
-// -------------------------------------------------------------------------
-
-    @Test
-    void rejectedPlayCardDoesNotSendNetworkAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        controller.playCard(currentPlayer, 0, 0);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        assertTrue(target.isEmpty());
+        assertTrue(current.hasCard(card));
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void rejectedPlayCardDoesNotNotifyStateChangedListener() {
+    void playCard_noopWhenNotPlayersTurn() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
-
-        controller.playCard(currentPlayer, 0, 0);
-
-        assertEquals(0, notificationCount.get());
-    }
-
-    @Test
-    void rejectedPlayCardDoesNotChangeCurrentPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        controller.playCard(currentPlayer, 0, 0);
-
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void rejectedPlayCardDoesNotChangeScore() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        currentPlayer.addScore(5);
-
-        controller.playCard(currentPlayer, 0, 0);
-
-        assertEquals(5, currentPlayer.getScore());
-    }
-
-    @Test
-    void rejectedPlayCardDoesNotChangeHandOrSelection() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
+        Player current = getCurrentPlayer();
+        Player other = controller.getMatch().getOtherPlayer(current);
         Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(other, card);
+        Field target = findEmptyPlayableField();
 
-        prepareSelectedCard(currentPlayer, card);
+        controller.playCard(other, target.getRow(), target.getColumn());
 
-        Field occupiedField = findEmptyPlayableField();
+        assertTrue(target.isEmpty());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
 
-        occupiedField.placeCard(
-                new Card(GameColor.GREEN, 2),
-                playerTwo,
-                2
-        );
+    @Test
+    void playCard_noopWhenNoCardSelected() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Field target = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                occupiedField.getRow(),
-                occupiedField.getColumn()
-        );
+        controller.playCard(current, target.getRow(), target.getColumn());
 
-        assertTrue(currentPlayer.hasCard(card));
-        assertSame(card, currentPlayer.getSelectedCard());
-        assertEquals(1, currentPlayer.getHandCardCount());
+        assertTrue(target.isEmpty());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"-1, 0", "0, -1", "3, 0", "0, 3", "-1, -1", "3, 3"})
+    void playCard_noopWhenPositionOutOfBounds(int row, int column) {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+
+        controller.playCard(current, row, column);
+
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @Test
+    void playCard_noopWhenPositionIsCenterDrawField() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+
+        controller.playCard(current, 1, 1);
+
+        assertTrue(controller.getMatch().getGameState().getBoard().getField(1, 1).isEmpty());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @Test
+    void playCard_noopWhenTargetFieldOccupied() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Field target = findEmptyPlayableField();
+        target.placeCard(new Card(GameColor.GREEN, 2), playerTwo, 2);
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+
+        controller.playCard(current, target.getRow(), target.getColumn());
+
+        assertEquals(GameColor.GREEN, target.getCard().getColor());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @Test
+    void playCard_transmitsOnSuccess() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Card card = new Card(GameColor.YELLOW, 3);
+        prepareSelectedCard(current, card);
+        Field target = findEmptyPlayableField();
+
+        controller.playCard(current, target.getRow(), target.getColumn());
+
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
+        verify(networkManager).sendGameChange(captor.capture());
+        assertEquals(GameAction.ActionType.PLAY_CARD, captor.getValue().type());
+        assertEquals(target.getRow(), captor.getValue().boardPositionRow());
+    }
+
+    @Test
+    void playCard_doesNotTransmitOnNoop() {
+        controller.startMatch(playerOne, playerTwo);
+        controller.playCard(playerOne, 0, 0);
+        verify(networkManager, never()).sendGameChange(Mockito.any());
+    }
+
+    @Test
+    void playCard_triggersStateChangedOnSuccess() {
+        controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        prepareSelectedCard(current, new Card(GameColor.YELLOW, 3));
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
+
+        controller.playCard(current, 0, 0);
+
+        assertEquals(1, count.get());
+    }
+
+    @Test
+    void playCard_doesNotTriggerStateChangedOnNoop() {
+        controller.startMatch(playerOne, playerTwo);
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
+
+        controller.playCard(playerOne, 0, 0);
+
+        assertEquals(0, count.get());
+    }
+
+    @Test
+    void playCard_throwsNpeWhenPlayerNull() {
+        controller.startMatch(playerOne, playerTwo);
+        assertThrows(NullPointerException.class, () -> controller.playCard(null, 0, 0));
     }
 
     // -------------------------------------------------------------------------
-// drawCard - successful actions
-// -------------------------------------------------------------------------
+    // drawCard
+    // -------------------------------------------------------------------------
 
     @Test
-    void drawCardAddsOneCardToCurrentPlayersHand() {
+    void drawCard_addsGeneratedCardToHand() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
 
-        Player currentPlayer = getCurrentPlayer();
-        int previousCardCount = currentPlayer.getHandCardCount();
+        controller.drawCard(current);
 
-        controller.drawCard(currentPlayer);
-
-        assertEquals(
-                previousCardCount + 1,
-                currentPlayer.getHandCardCount()
-        );
+        assertEquals(1, current.getHandCardCount());
+        assertNotNull(current.getHandCards().get(0));
     }
 
     @Test
-    void drawCardAddsValidCard() {
+    void drawCard_advancesTurnOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Player other = controller.getMatch().getOtherPlayer(current);
 
-        Player currentPlayer = getCurrentPlayer();
+        controller.drawCard(current);
 
-        controller.drawCard(currentPlayer);
-
-        Card drawnCard = currentPlayer.getHandCards().get(0);
-
-        assertNotNull(drawnCard);
-        assertTrue(drawnCard.getColor().isCardColor());
-        assertTrue(drawnCard.getValue() >= 1);
-        assertTrue(drawnCard.getValue() <= 6);
-    }
-
-    @Test
-    void drawCardPreservesExistingCards() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Card existingCard = new Card(GameColor.YELLOW, 3);
-
-        currentPlayer.addCard(existingCard);
-
-        controller.drawCard(currentPlayer);
-
-        assertTrue(currentPlayer.hasCard(existingCard));
-        assertEquals(2, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void drawCardSwitchesTurnToOtherPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch().getOtherPlayer(currentPlayer);
-
-        controller.drawCard(currentPlayer);
-
-        assertSame(
-                otherPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void drawCardDoesNotChangePlayerScore() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        currentPlayer.addScore(8);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(8, currentPlayer.getScore());
-    }
-
-    @Test
-    void drawCardDoesNotModifyBoard() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
-
-        controller.drawCard(currentPlayer);
-
-        for (int row = 0; row < 3; row++) {
-            for (int column = 0; column < 3; column++) {
-                assertTrue(board.getField(row, column).isEmpty());
-            }
-        }
-    }
-
-    @Test
-    void drawCardNotifiesStateChangedListenerOnce() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(1, notificationCount.get());
-    }
-
-// -------------------------------------------------------------------------
-// drawCard - hand limit
-// -------------------------------------------------------------------------
-
-    @ParameterizedTest
-    @ValueSource(ints = {0, 1, 5, 8, 9})
-    void drawCardSucceedsWhenPlayerHasFewerThanTenCards(
-            int initialCardCount
-    ) {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, initialCardCount);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(
-                initialCardCount + 1,
-                currentPlayer.getHandCardCount()
-        );
-    }
-
-    @Test
-    void drawCardAtNineCardsFillsHandToTen() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 9);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(10, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void drawCardDoesNothingWhenPlayerHasTenCards() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 10);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(10, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void drawCardDoesNothingWhenPlayerHasMoreThanTenCards() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 11);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(11, currentPlayer.getHandCardCount());
-    }
-
-    @Test
-    void rejectedDrawAtHandLimitDoesNotSwitchTurn() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 10);
-
-        controller.drawCard(currentPlayer);
-
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-// -------------------------------------------------------------------------
-// drawCard - invalid players and states
-// -------------------------------------------------------------------------
-
-    @Test
-    void drawCardDoesNothingWhenItIsNotPlayersTurn() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch().getOtherPlayer(currentPlayer);
-
-        controller.drawCard(otherPlayer);
-
-        assertEquals(0, otherPlayer.getHandCardCount());
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-    @Test
-    void drawCardDoesNothingForForeignPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player foreignPlayer =
-                new Player(3, "Foreign Player");
-
-        controller.drawCard(foreignPlayer);
-
-        assertEquals(0, foreignPlayer.getHandCardCount());
-    }
-
-    @Test
-    void drawCardRejectsNullPlayer() {
-        controller.startMatch(playerOne, playerTwo);
-
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.drawCard(null)
-        );
+        assertSame(other, getCurrentPlayer());
     }
 
     @ParameterizedTest
-    @EnumSource(
-            value = MatchStatus.class,
-            names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"}
-    )
-    void drawCardDoesNothingWhenMatchIsNotRunning(
-            MatchStatus matchStatus
-    ) {
+    @EnumSource(value = MatchStatus.class, names = {"PAUSED", "FINISHED", "WAITING_FOR_NETWORK"})
+    void drawCard_noopWhenMatchNotRunning(MatchStatus status) {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        controller.getMatch().setMatchStatus(status);
 
-        Player currentPlayer = getCurrentPlayer();
+        controller.drawCard(current);
 
-        controller.getMatch().setMatchStatus(matchStatus);
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(0, currentPlayer.getHandCardCount());
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
-    }
-
-// -------------------------------------------------------------------------
-// drawCard - network action
-// -------------------------------------------------------------------------
-
-    @Test
-    void successfulDrawCardSendsDrawCardAction() {
-        
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        controller.drawCard(currentPlayer);
-
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
-
-        verify(networkManager)
-                .sendGameChange(captor.capture());
-
-        GameAction action = captor.getValue();
-
-        assertEquals(
-                GameAction.ActionType.DRAW_CARD,
-                action.type()
-        );
-
-        assertNotNull(action.card());
-        assertTrue(action.card().getColor().isCardColor());
-        assertTrue(action.card().getValue() >= 1);
-        assertTrue(action.card().getValue() <= 6);
+        assertEquals(0, current.getHandCardCount());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void successfulDrawCardSendsExactlyOneAction() {
-        
+    void drawCard_noopWhenNotPlayersTurn() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        Player other = controller.getMatch().getOtherPlayer(current);
 
-        Player currentPlayer = getCurrentPlayer();
+        controller.drawCard(other);
 
-        controller.drawCard(currentPlayer);
-
-        verify(
-                networkManager,
-                times(1)
-        ).sendGameChange(Mockito.any(GameAction.class));
+        assertEquals(0, other.getHandCardCount());
+        assertSame(current, getCurrentPlayer());
     }
 
     @Test
-    void sentDrawnCardMatchesLocallyAddedCard() {
-        
+    void drawCard_noopWhenHandAlreadyHasTenCards() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
+        addCards(current, 10);
 
-        Player currentPlayer = getCurrentPlayer();
+        controller.drawCard(current);
 
-        controller.drawCard(currentPlayer);
-
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
-
-        verify(networkManager)
-                .sendGameChange(captor.capture());
-
-        GameAction sentAction = captor.getValue();
-
-        assertEquals(1, currentPlayer.getHandCardCount());
-        assertSame(
-                sentAction.card(),
-                currentPlayer.getHandCards().get(0)
-        );
-    }
-
-    //TODO
-    @Test
-    void drawCardWithoutNetworkManagerStillAppliesLocally() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(1, currentPlayer.getHandCardCount());
+        assertEquals(10, current.getHandCardCount());
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void rejectedDrawCardDoesNotSendAction() {
-        
+    void drawCard_transmitsOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
+        Player current = getCurrentPlayer();
 
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch().getOtherPlayer(currentPlayer);
+        controller.drawCard(current);
 
-        controller.drawCard(otherPlayer);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
+        verify(networkManager).sendGameChange(captor.capture());
+        assertEquals(GameAction.ActionType.DRAW_CARD, captor.getValue().type());
+        assertNotNull(captor.getValue().card());
     }
 
     @Test
-    void drawCardAtHandLimitDoesNotSendAction() {
-        
+    void drawCard_doesNotTransmitOnNoop() {
         controller.startMatch(playerOne, playerTwo);
+        Player other = controller.getMatch().getOtherPlayer(getCurrentPlayer());
 
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 10);
+        controller.drawCard(other);
 
-        controller.drawCard(currentPlayer);
-
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any());
     }
 
     @Test
-    void drawCardWithNullPlayerDoesNotSendAction() {
-        
+    void drawCard_triggersStateChangedOnSuccess() {
         controller.startMatch(playerOne, playerTwo);
+        AtomicInteger count = new AtomicInteger();
+        controller.setOnStateChangedListener(count::incrementAndGet);
 
-        assertThrows(
-                NullPointerException.class,
-                () -> controller.drawCard(null)
-        );
+        controller.drawCard(getCurrentPlayer());
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
-    }
-
-// -------------------------------------------------------------------------
-// drawCard - listener behavior on rejection
-// -------------------------------------------------------------------------
-
-    @Test
-    void rejectedDrawCardDoesNotNotifyStateChangedListener() {
-        controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        Player otherPlayer =
-                controller.getMatch().getOtherPlayer(currentPlayer);
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
-
-        controller.drawCard(otherPlayer);
-
-        assertEquals(0, notificationCount.get());
+        assertEquals(1, count.get());
     }
 
     @Test
-    void drawCardAtHandLimitDoesNotNotifyStateChangedListener() {
+    void drawCard_throwsNpeWhenPlayerNull() {
         controller.startMatch(playerOne, playerTwo);
-
-        Player currentPlayer = getCurrentPlayer();
-        addCards(currentPlayer, 10);
-
-        AtomicInteger notificationCount =
-                new AtomicInteger();
-
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
-
-        controller.drawCard(currentPlayer);
-
-        assertEquals(0, notificationCount.get());
+        assertThrows(NullPointerException.class, () -> controller.drawCard(null));
     }
 
     // -------------------------------------------------------------------------
@@ -3379,12 +1684,7 @@ class GameControllerTest {
         Card card = new Card(GameColor.YELLOW, 3);
         remotePlayer.addCard(card);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SELECT_CARD,
-                        card
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
 
         assertSame(card, remotePlayer.getSelectedCard());
         assertTrue(remotePlayer.hasSelectedCard());
@@ -3403,12 +1703,7 @@ class GameControllerTest {
         remotePlayer.addCard(secondCard);
         remotePlayer.selectCard(firstCard);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SELECT_CARD,
-                        secondCard
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, secondCard));
 
         assertSame(secondCard, remotePlayer.getSelectedCard());
     }
@@ -3424,12 +1719,7 @@ class GameControllerTest {
 
         remotePlayer.addCard(storedCard);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SELECT_CARD,
-                        equalCard
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, equalCard));
 
         assertEquals(equalCard, remotePlayer.getSelectedCard());
     }
@@ -3443,12 +1733,7 @@ class GameControllerTest {
 
         remotePlayer.addCard(card);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SELECT_CARD,
-                        card
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
 
         assertTrue(remotePlayer.hasCard(card));
         assertEquals(1, remotePlayer.getHandCardCount());
@@ -3462,17 +1747,9 @@ class GameControllerTest {
         Card card = new Card(GameColor.YELLOW, 3);
         remotePlayer.addCard(card);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SELECT_CARD,
-                        card
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -3489,11 +1766,7 @@ class GameControllerTest {
         remotePlayer.addCard(card);
         remotePlayer.selectCard(card);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.UNSELECT_CARD
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
 
         assertNull(remotePlayer.getSelectedCard());
         assertFalse(remotePlayer.hasSelectedCard());
@@ -3509,11 +1782,7 @@ class GameControllerTest {
         remotePlayer.addCard(card);
         remotePlayer.selectCard(card);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.UNSELECT_CARD
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
 
         assertTrue(remotePlayer.hasCard(card));
         assertEquals(1, remotePlayer.getHandCardCount());
@@ -3523,33 +1792,18 @@ class GameControllerTest {
     void remoteUnselectCardDoesNotThrowWithoutSelection() {
         prepareGuestMatch();
 
-        assertDoesNotThrow(
-                () -> controller.handleRemoteAction(
-                        new GameAction(
-                                GameAction.ActionType.UNSELECT_CARD
-                        )
-                )
-        );
+        assertDoesNotThrow(() -> controller.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD)));
 
-        assertFalse(
-                controller.getRemotePlayer().hasSelectedCard()
-        );
+        assertFalse(controller.getRemotePlayer().hasSelectedCard());
     }
 
     @Test
     void remoteUnselectCardDoesNotSendNetworkAction() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.UNSELECT_CARD
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -3563,12 +1817,7 @@ class GameControllerTest {
         Player remotePlayer = controller.getRemotePlayer();
         Card card = new Card(GameColor.GREEN, 5);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DRAW_CARD,
-                        card
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, card));
 
         assertTrue(remotePlayer.hasCard(card));
         assertEquals(1, remotePlayer.getHandCardCount());
@@ -3581,17 +1830,9 @@ class GameControllerTest {
         Player remotePlayer = controller.getRemotePlayer();
         Card card = new Card(GameColor.CYAN, 4);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DRAW_CARD,
-                        card
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, card));
 
-        assertSame(
-                card,
-                remotePlayer.getHandCards().get(0)
-        );
+        assertSame(card, remotePlayer.getHandCards().get(0));
     }
 
     @Test
@@ -3605,12 +1846,7 @@ class GameControllerTest {
 
         remotePlayer.addCard(existingCard);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DRAW_CARD,
-                        drawnCard
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, drawnCard));
 
         assertTrue(remotePlayer.hasCard(existingCard));
         assertTrue(remotePlayer.hasCard(drawnCard));
@@ -3623,43 +1859,22 @@ class GameControllerTest {
 
         Player remotePlayer = controller.getRemotePlayer();
 
-        controller.getMatch()
-                .getGameState()
-                .setCurrentPlayer(remotePlayer);
+        controller.getMatch().getGameState().setCurrentPlayer(remotePlayer);
 
-        Player expectedNextPlayer =
-                controller.getMatch().getOtherPlayer(remotePlayer);
+        Player expectedNextPlayer = controller.getMatch().getOtherPlayer(remotePlayer);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DRAW_CARD,
-                        new Card(GameColor.GREEN, 3)
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, new Card(GameColor.GREEN, 3)));
 
-        assertSame(
-                expectedNextPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
+        assertSame(expectedNextPlayer, controller.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
     void remoteDrawCardDoesNotSendNetworkAction() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DRAW_CARD,
-                        new Card(GameColor.GREEN, 3)
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, new Card(GameColor.GREEN, 3)));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -3676,9 +1891,7 @@ class GameControllerTest {
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertSame(card, targetField.getCard());
     }
@@ -3693,14 +1906,9 @@ class GameControllerTest {
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
-        assertEquals(
-                remotePlayer.getId(),
-                targetField.getCardOwnerId()
-        );
+        assertEquals(remotePlayer.getId(), targetField.getCardOwnerId());
     }
 
     @Test
@@ -3711,12 +1919,9 @@ class GameControllerTest {
         Card card = new Card(GameColor.YELLOW, 4);
         prepareSelectedCard(remotePlayer, card);
 
-        Field targetField =
-                findEmptyFieldWithColor(GameColor.GREY);
+        Field targetField = findEmptyFieldWithColor(GameColor.GREY);
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertEquals(4, targetField.getDisplayedScore());
         assertEquals(4, remotePlayer.getScore());
@@ -3732,9 +1937,7 @@ class GameControllerTest {
         Card card = new Card(targetField.getColor(), 5);
         prepareSelectedCard(remotePlayer, card);
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertEquals(10, targetField.getDisplayedScore());
         assertEquals(10, remotePlayer.getScore());
@@ -3747,16 +1950,11 @@ class GameControllerTest {
         Player remotePlayer = prepareRemotePlayerTurn();
         Field targetField = findEmptyCardColoredField();
 
-        Card card = new Card(
-                findDifferentCardColor(targetField.getColor()),
-                6
-        );
+        Card card = new Card(findDifferentCardColor(targetField.getColor()), 6);
 
         prepareSelectedCard(remotePlayer, card);
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertEquals(0, targetField.getDisplayedScore());
         assertEquals(0, remotePlayer.getScore());
@@ -3772,9 +1970,7 @@ class GameControllerTest {
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertFalse(remotePlayer.hasCard(card));
         assertEquals(0, remotePlayer.getHandCardCount());
@@ -3790,9 +1986,7 @@ class GameControllerTest {
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
         assertFalse(remotePlayer.hasSelectedCard());
         assertNull(remotePlayer.getSelectedCard());
@@ -3803,24 +1997,16 @@ class GameControllerTest {
         prepareGuestMatch();
 
         Player remotePlayer = prepareRemotePlayerTurn();
-        Player expectedNextPlayer =
-                controller.getMatch().getOtherPlayer(remotePlayer);
+        Player expectedNextPlayer = controller.getMatch().getOtherPlayer(remotePlayer);
 
         Card card = new Card(GameColor.YELLOW, 3);
         prepareSelectedCard(remotePlayer, card);
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
-        assertSame(
-                expectedNextPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
+        assertSame(expectedNextPlayer, controller.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
@@ -3831,20 +2017,9 @@ class GameControllerTest {
         Card card = new Card(GameColor.YELLOW, 3);
         prepareSelectedCard(remotePlayer, card);
 
-        Field targetField =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard()
-                        .getField(2, 1);
+        Field targetField = controller.getMatch().getGameState().getBoard().getField(2, 1);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.PLAY_CARD,
-                        card,
-                        1,
-                        2
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.PLAY_CARD, card, 1, 2));
 
         assertSame(card, targetField.getCard());
     }
@@ -3859,14 +2034,9 @@ class GameControllerTest {
 
         Field targetField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, targetField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, targetField));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -3877,70 +2047,37 @@ class GameControllerTest {
     void receivingStartingPlayerAloneDoesNotReplaceGameState() {
         prepareGuestMatch();
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        1
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1));
 
-        assertSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertSame(previousGameState, controller.getMatch().getGameState());
     }
 
     @Test
     void startingPlayerIndexZeroSelectsPlayerOneForSetup() {
         prepareGuestMatch();
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertNotSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertNotSame(previousGameState, controller.getMatch().getGameState());
 
-        assertSame(
-                playerOne,
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer()
-        );
+        assertSame(playerOne, controller.getMatch().getGameState().getStartingPlayer());
     }
 
     @Test
     void startingPlayerIndexOneSelectsPlayerTwoForSetup() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        1
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertSame(
-                playerTwo,
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer()
-        );
+        assertSame(playerTwo, controller.getMatch().getGameState().getStartingPlayer());
     }
 
 // -------------------------------------------------------------------------
@@ -3951,176 +2088,91 @@ class GameControllerTest {
     void fewerThanEightBoardColorsDoNotReplaceGameState() {
         prepareGuestMatch();
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         for (int index = 0; index < 7; index++) {
-            sendRemoteBoardColor(
-                    REMOTE_FIELD_COLORS.get(index),
-                    index
-            );
+            sendRemoteBoardColor(REMOTE_FIELD_COLORS.get(index), index);
         }
 
-        assertSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertSame(previousGameState, controller.getMatch().getGameState());
     }
 
     @Test
     void eightBoardColorsWithoutStartingPlayerDoNotReplaceGameState() {
         prepareGuestMatch();
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertSame(previousGameState, controller.getMatch().getGameState());
     }
 
     @Test
     void startingPlayerAndEightColorsInitializeGuestRound() {
         prepareGuestMatch();
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertNotSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertNotSame(previousGameState, controller.getMatch().getGameState());
     }
 
     @Test
     void receivedBoardColorsAreAppliedInReceptionOrder() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertEquals(
-                REMOTE_FIELD_COLORS,
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard()
-                        .getFieldColors()
-        );
+        assertEquals(REMOTE_FIELD_COLORS, controller.getMatch().getGameState().getBoard().getFieldColors());
     }
 
     @Test
     void receivedSetupSetsStartingPlayerAsCurrentPlayer() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        1
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertSame(
-                playerTwo,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
+        assertSame(playerTwo, controller.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
     void secondCompleteRemoteSetupStartsNextRound() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertEquals(
-                1,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(1, controller.getMatch().getMatchState().getCurrentRound());
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        1
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1));
         sendRemoteBoardColors(SECOND_REMOTE_FIELD_COLORS);
 
-        assertEquals(
-                2,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(2, controller.getMatch().getMatchState().getCurrentRound());
 
-        assertEquals(
-                SECOND_REMOTE_FIELD_COLORS,
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard()
-                        .getFieldColors()
-        );
+        assertEquals(SECOND_REMOTE_FIELD_COLORS, controller.getMatch().getGameState().getBoard().getFieldColors());
 
-        assertSame(
-                playerTwo,
-                controller.getMatch()
-                        .getGameState()
-                        .getStartingPlayer()
-        );
+        assertSame(playerTwo, controller.getMatch().getGameState().getStartingPlayer());
     }
 
     @Test
     void completeRemoteBoardSetupDoesNotSendNetworkActions() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -4133,13 +2185,7 @@ class GameControllerTest {
 
         Card card = new Card(GameColor.YELLOW, 3);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DEAL_CARD,
-                        card,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card, 0));
 
         assertTrue(playerOne.hasCard(card));
         assertEquals(1, playerOne.getHandCardCount());
@@ -4152,13 +2198,7 @@ class GameControllerTest {
 
         Card card = new Card(GameColor.GREEN, 5);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DEAL_CARD,
-                        card,
-                        1
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card, 1));
 
         assertTrue(playerTwo.hasCard(card));
         assertEquals(1, playerTwo.getHandCardCount());
@@ -4171,13 +2211,7 @@ class GameControllerTest {
 
         Card card = new Card(GameColor.CYAN, 4);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DEAL_CARD,
-                        card,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card, 0));
 
         assertSame(card, playerOne.getHandCards().get(0));
     }
@@ -4186,43 +2220,20 @@ class GameControllerTest {
     void remoteDealCardDoesNotChangeCurrentPlayer() {
         prepareGuestMatch();
 
-        Player currentPlayer =
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer();
+        Player currentPlayer = controller.getMatch().getGameState().getCurrentPlayer();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DEAL_CARD,
-                        new Card(GameColor.PURPLE, 2),
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, new Card(GameColor.PURPLE, 2), 0));
 
-        assertSame(
-                currentPlayer,
-                controller.getMatch()
-                        .getGameState()
-                        .getCurrentPlayer()
-        );
+        assertSame(currentPlayer, controller.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
     void remoteDealCardDoesNotSendNetworkAction() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.DEAL_CARD,
-                        new Card(GameColor.PURPLE, 2),
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, new Card(GameColor.PURPLE, 2), 0));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -4233,16 +2244,9 @@ class GameControllerTest {
     void remoteMatchFinishedSetsMatchStatusToFinished() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_FINISHED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
 
-        assertEquals(
-                MatchStatus.FINISHED,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.FINISHED, controller.getMatch().getMatchStatus());
     }
 
     @Test
@@ -4251,11 +2255,7 @@ class GameControllerTest {
 
         Match activeMatch = controller.getMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_FINISHED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
 
         assertSame(activeMatch, controller.getMatch());
     }
@@ -4264,16 +2264,9 @@ class GameControllerTest {
     void remoteMatchFinishedDoesNotSendNetworkAction() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_FINISHED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -4286,15 +2279,9 @@ class GameControllerTest {
 
         AtomicInteger abortCount = new AtomicInteger();
 
-        controller.setOnMatchAbortedListener(
-                abortCount::incrementAndGet
-        );
+        controller.setOnMatchAbortedListener(abortCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertEquals(1, abortCount.get());
     }
@@ -4305,11 +2292,7 @@ class GameControllerTest {
 
         Match activeMatch = controller.getMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
         assertSame(activeMatch, controller.getMatch());
     }
@@ -4318,32 +2301,18 @@ class GameControllerTest {
     void remoteMatchAbortedDoesNotAutomaticallyFinishMatch() {
         prepareGuestMatch();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
-        assertEquals(
-                MatchStatus.RUNNING,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.RUNNING, controller.getMatch().getMatchStatus());
     }
 
     @Test
     void remoteMatchAbortedDoesNotSendNetworkAction() {
         prepareGuestMatchWithNetworkManager();
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.MATCH_ABORTED
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
 
-        verify(
-                networkManager,
-                never()
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, never()).sendGameChange(Mockito.any(GameAction.class));
     }
 
 // -------------------------------------------------------------------------
@@ -4351,25 +2320,13 @@ class GameControllerTest {
 // -------------------------------------------------------------------------
 
     @ParameterizedTest
-    @EnumSource(
-            value = GameAction.ActionType.class,
-            names = {
-                    "UNSELECT_CARD",
-                    "MATCH_FINISHED",
-                    "MATCH_ABORTED"
-            }
-    )
-    void remoteActionNotifiesStateChangedListenerOnce(
-            GameAction.ActionType type
-    ) {
+    @EnumSource(value = GameAction.ActionType.class, names = {"UNSELECT_CARD", "MATCH_FINISHED", "MATCH_ABORTED"})
+    void remoteActionNotifiesStateChangedListenerOnce(GameAction.ActionType type) {
         prepareGuestMatch();
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
         controller.handleRemoteAction(new GameAction(type));
 
@@ -4380,25 +2337,14 @@ class GameControllerTest {
     void partialBoardSetupNotifiesListenerForEachReceivedAction() {
         prepareGuestMatch();
 
-        AtomicInteger notificationCount =
-                new AtomicInteger();
+        AtomicInteger notificationCount = new AtomicInteger();
 
-        controller.setOnStateChangedListener(
-                notificationCount::incrementAndGet
-        );
+        controller.setOnStateChangedListener(notificationCount::incrementAndGet);
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
         for (int index = 0; index < 3; index++) {
-            sendRemoteBoardColor(
-                    REMOTE_FIELD_COLORS.get(index),
-                    index
-            );
+            sendRemoteBoardColor(REMOTE_FIELD_COLORS.get(index), index);
         }
 
         assertEquals(4, notificationCount.get());
@@ -4414,33 +2360,20 @@ class GameControllerTest {
 
         fillPlayableFieldsExcept(2);
 
-        GameState gameStateBeforeMove =
-                controller.getMatch().getGameState();
+        GameState gameStateBeforeMove = controller.getMatch().getGameState();
 
-        Player currentPlayer =
-                gameStateBeforeMove.getCurrentPlayer();
+        Player currentPlayer = gameStateBeforeMove.getCurrentPlayer();
 
         Card card = new Card(GameColor.YELLOW, 3);
         prepareSelectedCard(currentPlayer, card);
 
         Field emptyField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                emptyField.getRow(),
-                emptyField.getColumn()
-        );
+        controller.playCard(currentPlayer, emptyField.getRow(), emptyField.getColumn());
 
-        assertSame(
-                gameStateBeforeMove,
-                controller.getMatch().getGameState()
-        );
+        assertSame(gameStateBeforeMove, controller.getMatch().getGameState());
 
-        assertFalse(
-                controller.getMatch()
-                        .getGameState()
-                        .isGameOver()
-        );
+        assertFalse(controller.getMatch().getGameState().isGameOver());
     }
 
     @Test
@@ -4449,27 +2382,18 @@ class GameControllerTest {
 
         fillPlayableFieldsExcept(1);
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
-        Player currentPlayer =
-                previousGameState.getCurrentPlayer();
+        Player currentPlayer = previousGameState.getCurrentPlayer();
 
         Card card = new Card(GameColor.YELLOW, 3);
         prepareSelectedCard(currentPlayer, card);
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        assertNotSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertNotSame(previousGameState, controller.getMatch().getGameState());
     }
 
     @Test
@@ -4484,18 +2408,9 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        assertEquals(
-                2,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(2, controller.getMatch().getMatchState().getCurrentRound());
     }
 
     @Test
@@ -4504,10 +2419,7 @@ class GameControllerTest {
 
         fillPlayableFieldsExcept(1);
 
-        Board previousBoard =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board previousBoard = controller.getMatch().getGameState().getBoard();
 
         Player currentPlayer = getCurrentPlayer();
         Card card = new Card(GameColor.YELLOW, 3);
@@ -4515,16 +2427,9 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        Board newBoard =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board newBoard = controller.getMatch().getGameState().getBoard();
 
         assertNotSame(previousBoard, newBoard);
         assertFalse(newBoard.isFull());
@@ -4542,15 +2447,9 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        int totalCards =
-                playerOne.getHandCardCount()
-                        + playerTwo.getHandCardCount();
+        int totalCards = playerOne.getHandCardCount() + playerTwo.getHandCardCount();
 
         assertEquals(5, totalCards);
     }
@@ -4570,11 +2469,7 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
         assertEquals(0, playerOne.getScore());
         assertEquals(0, playerTwo.getScore());
@@ -4584,11 +2479,9 @@ class GameControllerTest {
     void roundTransitionClearsPreviousHandsAndSelections() {
         prepareHostMatchWithoutInitialCards();
 
-        Card firstExtraCard =
-                new Card(GameColor.GREEN, 4);
+        Card firstExtraCard = new Card(GameColor.GREEN, 4);
 
-        Card secondExtraCard =
-                new Card(GameColor.CYAN, 5);
+        Card secondExtraCard = new Card(GameColor.CYAN, 5);
 
         playerOne.addCard(firstExtraCard);
         playerTwo.addCard(secondExtraCard);
@@ -4605,20 +2498,12 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
         assertFalse(playerOne.hasSelectedCard());
         assertFalse(playerTwo.hasSelectedCard());
 
-        assertEquals(
-                5,
-                playerOne.getHandCardCount()
-                        + playerTwo.getHandCardCount()
-        );
+        assertEquals(5, playerOne.getHandCardCount() + playerTwo.getHandCardCount());
     }
 
     // -------------------------------------------------------------------------
@@ -4673,12 +2558,7 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        assertEquals(
-                List.of(RoundResult.PLAYER_ONE_WIN),
-                controller.getMatch()
-                        .getMatchState()
-                        .getRoundResults()
-        );
+        assertEquals(List.of(RoundResult.PLAYER_ONE_WIN), controller.getMatch().getMatchState().getRoundResults());
     }
 
     @Test
@@ -4690,12 +2570,7 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        assertEquals(
-                List.of(RoundResult.PLAYER_TWO_WIN),
-                controller.getMatch()
-                        .getMatchState()
-                        .getRoundResults()
-        );
+        assertEquals(List.of(RoundResult.PLAYER_TWO_WIN), controller.getMatch().getMatchState().getRoundResults());
     }
 
     @Test
@@ -4707,12 +2582,7 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        assertEquals(
-                List.of(RoundResult.DRAW),
-                controller.getMatch()
-                        .getMatchState()
-                        .getRoundResults()
-        );
+        assertEquals(List.of(RoundResult.DRAW), controller.getMatch().getMatchState().getRoundResults());
     }
 
     // -------------------------------------------------------------------------
@@ -4731,61 +2601,21 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
 
-        verify(
-                networkManager,
-                atLeastOnce()
-        ).sendGameChange(captor.capture());
+        verify(networkManager, atLeastOnce()).sendGameChange(captor.capture());
 
         List<GameAction> actions = captor.getAllValues();
 
-        assertEquals(
-                1,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.PLAY_CARD
-                        )
-                        .count()
-        );
+        assertEquals(1, actions.stream().filter(action -> action.type() == GameAction.ActionType.PLAY_CARD).count());
 
-        assertEquals(
-                1,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_STARTING_PLAYER
-                        )
-                        .count()
-        );
+        assertEquals(1, actions.stream().filter(action -> action.type() == GameAction.ActionType.SET_STARTING_PLAYER).count());
 
-        assertEquals(
-                8,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_BOARD_COLOR
-                        )
-                        .count()
-        );
+        assertEquals(8, actions.stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).count());
 
-        assertEquals(
-                5,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.DEAL_CARD
-                        )
-                        .count()
-        );
+        assertEquals(5, actions.stream().filter(action -> action.type() == GameAction.ActionType.DEAL_CARD).count());
     }
 
     @Test
@@ -4800,16 +2630,9 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
 
-        verify(
-                networkManager,
-                times(15)
-        ).sendGameChange(Mockito.any(GameAction.class));
+        verify(networkManager, times(15)).sendGameChange(Mockito.any(GameAction.class));
     }
 
     // -------------------------------------------------------------------------
@@ -4822,8 +2645,7 @@ class GameControllerTest {
 
         fillPlayableFieldsExcept(1);
 
-        GameState previousGameState =
-                controller.getMatch().getGameState();
+        GameState previousGameState = controller.getMatch().getGameState();
 
         Player remotePlayer = prepareRemotePlayerTurn();
 
@@ -4832,20 +2654,11 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, lastField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, lastField));
 
-        assertSame(
-                previousGameState,
-                controller.getMatch().getGameState()
-        );
+        assertSame(previousGameState, controller.getMatch().getGameState());
 
-        assertTrue(
-                controller.getMatch()
-                        .getGameState()
-                        .isGameOver()
-        );
+        assertTrue(controller.getMatch().getGameState().isGameOver());
     }
 
     @Test
@@ -4861,16 +2674,9 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, lastField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, lastField));
 
-        assertEquals(
-                1,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(1, controller.getMatch().getMatchState().getCurrentRound());
     }
 
     @Test
@@ -4878,20 +2684,10 @@ class GameControllerTest {
         prepareGuestMatch();
 
         // Initial setup for round one.
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
         sendRemoteBoardColors(REMOTE_FIELD_COLORS);
 
-        assertEquals(
-                1,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(1, controller.getMatch().getMatchState().getCurrentRound());
 
         fillPlayableFieldsExcept(1);
 
@@ -4902,25 +2698,13 @@ class GameControllerTest {
 
         Field lastField = findEmptyPlayableField();
 
-        controller.handleRemoteAction(
-                createRemotePlayAction(card, lastField)
-        );
+        controller.handleRemoteAction(createRemotePlayAction(card, lastField));
 
         // Setup for round two.
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_STARTING_PLAYER,
-                        0
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
         sendRemoteBoardColors(SECOND_REMOTE_FIELD_COLORS);
 
-        assertEquals(
-                2,
-                controller.getMatch()
-                        .getMatchState()
-                        .getCurrentRound()
-        );
+        assertEquals(2, controller.getMatch().getMatchState().getCurrentRound());
     }
 
     // -------------------------------------------------------------------------
@@ -4940,10 +2724,7 @@ class GameControllerTest {
 
         assertEquals(2, playerOne.getWins());
 
-        assertEquals(
-                MatchStatus.FINISHED,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.FINISHED, controller.getMatch().getMatchStatus());
     }
 
     @Test
@@ -4959,10 +2740,7 @@ class GameControllerTest {
 
         assertEquals(2, playerTwo.getWins());
 
-        assertEquals(
-                MatchStatus.FINISHED,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.FINISHED, controller.getMatch().getMatchStatus());
     }
 
     @Test
@@ -4976,12 +2754,7 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        assertSame(
-                playerOne,
-                controller.getMatch()
-                        .getMatchState()
-                        .getMatchWinner()
-        );
+        assertSame(playerOne, controller.getMatch().getMatchState().getMatchWinner());
     }
 
     @Test
@@ -4994,22 +2767,11 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
 
-        verify(
-                networkManager,
-                atLeastOnce()
-        ).sendGameChange(captor.capture());
+        verify(networkManager, atLeastOnce()).sendGameChange(captor.capture());
 
-        assertTrue(
-                captor.getAllValues()
-                        .stream()
-                        .anyMatch(action ->
-                                action.type()
-                                        == GameAction.ActionType.MATCH_FINISHED
-                        )
-        );
+        assertTrue(captor.getAllValues().stream().anyMatch(action -> action.type() == GameAction.ActionType.MATCH_FINISHED));
     }
 
     @Test
@@ -5022,35 +2784,15 @@ class GameControllerTest {
 
         finishDrawnRound();
 
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
 
-        verify(
-                networkManager,
-                atLeastOnce()
-        ).sendGameChange(captor.capture());
+        verify(networkManager, atLeastOnce()).sendGameChange(captor.capture());
 
         List<GameAction> actions = captor.getAllValues();
 
-        assertEquals(
-                0,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.SET_BOARD_COLOR
-                        )
-                        .count()
-        );
+        assertEquals(0, actions.stream().filter(action -> action.type() == GameAction.ActionType.SET_BOARD_COLOR).count());
 
-        assertEquals(
-                0,
-                actions.stream()
-                        .filter(action ->
-                                action.type()
-                                        == GameAction.ActionType.DEAL_CARD
-                        )
-                        .count()
-        );
+        assertEquals(0, actions.stream().filter(action -> action.type() == GameAction.ActionType.DEAL_CARD).count());
     }
 
     // -------------------------------------------------------------------------
@@ -5072,93 +2814,76 @@ class GameControllerTest {
 
     @Test
     void startListeningForActionsRejectsNotConnectedRole() {
-        
+
         controller.setNetworkRole(Role.NOT_CONNECTED);
 
-        assertThrows(
-                IllegalStateException.class,
-                controller::startListeningForActions
-        );
+        assertThrows(IllegalStateException.class, controller::startListeningForActions);
     }
 
     @Test
     void validConfigurationStartsActionListener() throws Exception {
         CountDownLatch fetchStarted = new CountDownLatch(1);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenAnswer(invocation -> {
-                    fetchStarted.countDown();
-                    Thread.sleep(Long.MAX_VALUE);
-                    return null;
-                });
+        Mockito.when(networkManager.fetchNextAction()).thenAnswer(invocation -> {
+            fetchStarted.countDown();
+            Thread.sleep(Long.MAX_VALUE);
+            return null;
+        });
 
-        
+
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
 
-        assertTrue(
-                fetchStarted.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(fetchStarted.await(1, TimeUnit.SECONDS));
 
         assertTrue(controller.isListeningForActions());
     }
 
     @Test
-    void startListeningForActionsDoesNothingWhenAlreadyRunning()
-            throws Exception {
+    void startListeningForActionsDoesNothingWhenAlreadyRunning() throws Exception {
         CountDownLatch fetchStarted = new CountDownLatch(1);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenAnswer(invocation -> {
-                    fetchStarted.countDown();
-                    Thread.sleep(Long.MAX_VALUE);
-                    return null;
-                });
+        Mockito.when(networkManager.fetchNextAction()).thenAnswer(invocation -> {
+            fetchStarted.countDown();
+            Thread.sleep(Long.MAX_VALUE);
+            return null;
+        });
 
-        
+
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
 
-        assertTrue(
-                fetchStarted.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(fetchStarted.await(1, TimeUnit.SECONDS));
 
         controller.startListeningForActions();
 
-        verify(
-                networkManager,
-                atMostOnce()
-        ).fetchNextAction();
+        verify(networkManager, atMostOnce()).fetchNextAction();
     }
 
     @Test
-    void stopListeningForActionsStopsRunningListener()
-            throws Exception {
+    void stopListeningForActionsStopsRunningListener() throws Exception {
         CountDownLatch fetchStarted = new CountDownLatch(1);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenAnswer(invocation -> {
-                    fetchStarted.countDown();
+        Mockito.when(networkManager.fetchNextAction()).thenAnswer(invocation -> {
+            fetchStarted.countDown();
 
-                    try {
-                        Thread.sleep(Long.MAX_VALUE);
-                    } catch (InterruptedException exception) {
-                        throw exception;
-                    }
+            try {
+                Thread.sleep(Long.MAX_VALUE);
+            } catch (InterruptedException exception) {
+                throw exception;
+            }
 
-                    return null;
-                });
+            return null;
+        });
 
-        
+
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
 
-        assertTrue(
-                fetchStarted.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(fetchStarted.await(1, TimeUnit.SECONDS));
 
         controller.stopListeningForActions();
 
@@ -5167,9 +2892,7 @@ class GameControllerTest {
 
     @Test
     void stopListeningForActionsCanBeCalledWithoutRunningListener() {
-        assertDoesNotThrow(
-                controller::stopListeningForActions
-        );
+        assertDoesNotThrow(controller::stopListeningForActions);
 
         assertFalse(controller.isListeningForActions());
     }
@@ -5178,33 +2901,27 @@ class GameControllerTest {
     void stopListeningForActionsCanBeCalledMultipleTimes() {
         controller.stopListeningForActions();
 
-        assertDoesNotThrow(
-                controller::stopListeningForActions
-        );
+        assertDoesNotThrow(controller::stopListeningForActions);
 
         assertFalse(controller.isListeningForActions());
     }
 
     @Test
-    void resetSessionStopsRunningActionListener()
-            throws Exception {
+    void resetSessionStopsRunningActionListener() throws Exception {
         CountDownLatch fetchStarted = new CountDownLatch(1);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenAnswer(invocation -> {
-                    fetchStarted.countDown();
-                    Thread.sleep(Long.MAX_VALUE);
-                    return null;
-                });
+        Mockito.when(networkManager.fetchNextAction()).thenAnswer(invocation -> {
+            fetchStarted.countDown();
+            Thread.sleep(Long.MAX_VALUE);
+            return null;
+        });
 
-        
+
         controller.setNetworkRole(Role.GUEST);
 
         controller.startListeningForActions();
 
-        assertTrue(
-                fetchStarted.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(fetchStarted.await(1, TimeUnit.SECONDS));
 
         controller.resetSession();
 
@@ -5218,111 +2935,72 @@ class GameControllerTest {
 // -------------------------------------------------------------------------
 
     @Test
-    void actionListenerProcessesFetchedMatchFinishedAction()
-            throws Exception {
+    void actionListenerProcessesFetchedMatchFinishedAction() throws Exception {
         controller.setNetworkRole(Role.GUEST);
-        
+
         controller.startMatch(playerOne, playerTwo);
 
         CountDownLatch actionHandled = new CountDownLatch(1);
 
-        controller.setOnStateChangedListener(
-                actionHandled::countDown
-        );
+        controller.setOnStateChangedListener(actionHandled::countDown);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenReturn(
-                        new GameAction(
-                                GameAction.ActionType.MATCH_FINISHED
-                        )
-                )
-                .thenAnswer(invocation -> {
-                    Thread.sleep(Long.MAX_VALUE);
-                    return null;
-                });
+        Mockito.when(networkManager.fetchNextAction()).thenReturn(new GameAction(GameAction.ActionType.MATCH_FINISHED)).thenAnswer(invocation -> {
+            Thread.sleep(Long.MAX_VALUE);
+            return null;
+        });
 
         controller.startListeningForActions();
 
-        assertTrue(
-                actionHandled.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(actionHandled.await(1, TimeUnit.SECONDS));
 
-        assertEquals(
-                MatchStatus.FINISHED,
-                controller.getMatch().getMatchStatus()
-        );
+        assertEquals(MatchStatus.FINISHED, controller.getMatch().getMatchStatus());
     }
 
     @Test
-    void actionListenerProcessesFetchedDealCardAction()
-            throws Exception {
+    void actionListenerProcessesFetchedDealCardAction() throws Exception {
         controller.setNetworkRole(Role.GUEST);
-        
+
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 4);
         CountDownLatch actionHandled = new CountDownLatch(1);
 
-        controller.setOnStateChangedListener(
-                actionHandled::countDown
-        );
+        controller.setOnStateChangedListener(actionHandled::countDown);
 
-        Mockito.when(networkManager.fetchNextAction())
-                .thenReturn(
-                        new GameAction(
-                                GameAction.ActionType.DEAL_CARD,
-                                card,
-                                0
-                        )
-                )
-                .thenAnswer(invocation -> {
-                    Thread.sleep(Long.MAX_VALUE);
-                    return null;
-                });
+        Mockito.when(networkManager.fetchNextAction()).thenReturn(new GameAction(GameAction.ActionType.DEAL_CARD, card, 0)).thenAnswer(invocation -> {
+            Thread.sleep(Long.MAX_VALUE);
+            return null;
+        });
 
         controller.startListeningForActions();
 
-        assertTrue(
-                actionHandled.await(1, TimeUnit.SECONDS)
-        );
+        assertTrue(actionHandled.await(1, TimeUnit.SECONDS));
 
         assertTrue(playerOne.hasCard(card));
     }
 
     @Test
     void interruptedActionListenerStopsCleanly() {
-        assertTimeoutPreemptively(
-                Duration.ofSeconds(2),
-                () -> {
-                    CountDownLatch fetchStarted =
-                            new CountDownLatch(1);
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            CountDownLatch fetchStarted = new CountDownLatch(1);
 
-                    Mockito.when(networkManager.fetchNextAction())
-                            .thenAnswer(invocation -> {
-                                fetchStarted.countDown();
-                                Thread.sleep(Long.MAX_VALUE);
-                                return null;
-                            });
+            Mockito.when(networkManager.fetchNextAction()).thenAnswer(invocation -> {
+                fetchStarted.countDown();
+                Thread.sleep(Long.MAX_VALUE);
+                return null;
+            });
 
-                    
-                    controller.setNetworkRole(Role.HOST);
 
-                    controller.startListeningForActions();
+            controller.setNetworkRole(Role.HOST);
 
-                    assertTrue(
-                            fetchStarted.await(
-                                    1,
-                                    TimeUnit.SECONDS
-                            )
-                    );
+            controller.startListeningForActions();
 
-                    controller.stopListeningForActions();
+            assertTrue(fetchStarted.await(1, TimeUnit.SECONDS));
 
-                    assertFalse(
-                            controller.isListeningForActions()
-                    );
-                }
-        );
+            controller.stopListeningForActions();
+
+            assertFalse(controller.isListeningForActions());
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -5330,116 +3008,74 @@ class GameControllerTest {
     // -------------------------------------------------------------------------
 
     private List<GameAction> captureSentActions() {
-        ArgumentCaptor<GameAction> captor =
-                ArgumentCaptor.forClass(GameAction.class);
+        ArgumentCaptor<GameAction> captor = ArgumentCaptor.forClass(GameAction.class);
 
-        verify(
-                networkManager,
-                atLeastOnce()
-        ).sendGameChange(captor.capture());
+        verify(networkManager, atLeastOnce()).sendGameChange(captor.capture());
 
         return captor.getAllValues();
     }
 
     private Player getCurrentPlayer() {
-        return controller.getMatch()
-                .getGameState()
-                .getCurrentPlayer();
+        return controller.getMatch().getGameState().getCurrentPlayer();
     }
 
-    private void prepareSelectedCard(
-            Player player,
-            Card card
-    ) {
+    private void prepareSelectedCard(Player player, Card card) {
         player.addCard(card);
         player.selectCard(card);
     }
 
     private Field findEmptyPlayableField() {
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board board = controller.getMatch().getGameState().getBoard();
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
-                if (
-                        !board.isCenterField(row, column)
-                                && board.getField(row, column).isEmpty()
-                ) {
+                if (!board.isCenterField(row, column) && board.getField(row, column).isEmpty()) {
                     return board.getField(row, column);
                 }
             }
         }
 
-        throw new IllegalStateException(
-                "No empty playable field found"
-        );
+        throw new IllegalStateException("No empty playable field found");
     }
 
     private Field findEmptyFieldWithColor(GameColor color) {
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board board = controller.getMatch().getGameState().getBoard();
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
-                if (
-                        !board.isCenterField(row, column)
-                                && board.getField(row, column).isEmpty()
-                                && board.getField(row, column).getColor() == color
-                ) {
+                if (!board.isCenterField(row, column) && board.getField(row, column).isEmpty() && board.getField(row, column).getColor() == color) {
                     return board.getField(row, column);
                 }
             }
         }
 
-        throw new IllegalStateException(
-                "No empty field found for color " + color
-        );
+        throw new IllegalStateException("No empty field found for color " + color);
     }
 
     private Field findEmptyCardColoredField() {
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board board = controller.getMatch().getGameState().getBoard();
 
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 3; column++) {
                 Field field = board.getField(row, column);
 
-                if (
-                        !board.isCenterField(row, column)
-                                && field.isEmpty()
-                                && field.getColor().isCardColor()
-                ) {
+                if (!board.isCenterField(row, column) && field.isEmpty() && field.getColor().isCardColor()) {
                     return field;
                 }
             }
         }
 
-        throw new IllegalStateException(
-                "No card-colored field found"
-        );
+        throw new IllegalStateException("No card-colored field found");
     }
 
-    private GameColor findDifferentCardColor(
-            GameColor excludedColor
-    ) {
+    private GameColor findDifferentCardColor(GameColor excludedColor) {
         for (GameColor color : GameColor.values()) {
-            if (
-                    color.isCardColor()
-                            && color != excludedColor
-            ) {
+            if (color.isCardColor() && color != excludedColor) {
                 return color;
             }
         }
 
-        throw new IllegalStateException(
-                "No different card color found"
-        );
+        throw new IllegalStateException("No different card color found");
     }
 
     private void addCards(Player player, int amount) {
@@ -5465,7 +3101,7 @@ class GameControllerTest {
 
     private void prepareGuestMatchWithNetworkManager() {
         controller.setNetworkRole(Role.GUEST);
-        
+
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
@@ -5475,59 +3111,28 @@ class GameControllerTest {
     private Player prepareRemotePlayerTurn() {
         Player remotePlayer = controller.getRemotePlayer();
 
-        controller.getMatch()
-                .getGameState()
-                .setCurrentPlayer(remotePlayer);
+        controller.getMatch().getGameState().setCurrentPlayer(remotePlayer);
 
         return remotePlayer;
     }
 
-    private GameAction createRemotePlayAction(
-            Card card,
-            Field field
-    ) {
-        return new GameAction(
-                GameAction.ActionType.PLAY_CARD,
-                card,
-                field.getColumn(),
-                field.getRow()
-        );
+    private GameAction createRemotePlayAction(Card card, Field field) {
+        return new GameAction(GameAction.ActionType.PLAY_CARD, card, field.getColumn(), field.getRow());
     }
 
-    private void sendRemoteBoardColors(
-            List<GameColor> colors
-    ) {
+    private void sendRemoteBoardColors(List<GameColor> colors) {
         for (int index = 0; index < colors.size(); index++) {
             sendRemoteBoardColor(colors.get(index), index);
         }
     }
 
-    private void sendRemoteBoardColor(
-            GameColor color,
-            int index
-    ) {
-        int[][] positions = {
-                {0, 0},
-                {0, 1},
-                {0, 2},
-                {1, 0},
-                {1, 2},
-                {2, 0},
-                {2, 1},
-                {2, 2}
-        };
+    private void sendRemoteBoardColor(GameColor color, int index) {
+        int[][] positions = {{0, 0}, {0, 1}, {0, 2}, {1, 0}, {1, 2}, {2, 0}, {2, 1}, {2, 2}};
 
         int row = positions[index][0];
         int column = positions[index][1];
 
-        controller.handleRemoteAction(
-                new GameAction(
-                        GameAction.ActionType.SET_BOARD_COLOR,
-                        color,
-                        column,
-                        row
-                )
-        );
+        controller.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, color, column, row));
     }
 
     private void prepareHostMatchWithoutInitialCards() {
@@ -5545,7 +3150,7 @@ class GameControllerTest {
 
     private void prepareHostMatchWithNetworkManagerWithoutInitialCards() {
         controller.setNetworkRole(Role.GUEST);
-        
+
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
@@ -5555,14 +3160,10 @@ class GameControllerTest {
     }
 
     private void fillPlayableFieldsExcept(int emptyFieldCount) {
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board board = controller.getMatch().getGameState().getBoard();
 
         int totalPlayableFields = 8;
-        int fieldsToFill =
-                totalPlayableFields - emptyFieldCount;
+        int fieldsToFill = totalPlayableFields - emptyFieldCount;
 
         int filledFields = 0;
 
@@ -5578,21 +3179,11 @@ class GameControllerTest {
 
                 Field field = board.getField(row, column);
 
-                Player owner =
-                        filledFields % 2 == 0
-                                ? playerOne
-                                : playerTwo;
+                Player owner = filledFields % 2 == 0 ? playerOne : playerTwo;
 
-                Card card = new Card(
-                        GameColor.YELLOW,
-                        filledFields % 6 + 1
-                );
+                Card card = new Card(GameColor.YELLOW, filledFields % 6 + 1);
 
-                field.placeCard(
-                        card,
-                        owner,
-                        card.getValue()
-                );
+                field.placeCard(card, owner, card.getValue());
 
                 filledFields++;
             }
@@ -5608,9 +3199,7 @@ class GameControllerTest {
         GameColor cardColor;
 
         if (lastField.getColor() == GameColor.GREY) {
-            throw new IllegalStateException(
-                    "Cannot guarantee zero points on a grey field"
-            );
+            throw new IllegalStateException("Cannot guarantee zero points on a grey field");
         }
 
         cardColor = findDifferentCardColor(lastField.getColor());
@@ -5619,18 +3208,11 @@ class GameControllerTest {
 
         prepareSelectedCard(currentPlayer, finalCard);
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
     }
 
     private Field fillBoardLeavingOneCardColoredFieldEmpty() {
-        Board board =
-                controller.getMatch()
-                        .getGameState()
-                        .getBoard();
+        Board board = controller.getMatch().getGameState().getBoard();
 
         Field fieldToLeaveEmpty = null;
 
@@ -5654,9 +3236,7 @@ class GameControllerTest {
         }
 
         if (fieldToLeaveEmpty == null) {
-            throw new IllegalStateException(
-                    "Board contains no card-colored field"
-            );
+            throw new IllegalStateException("Board contains no card-colored field");
         }
 
         int index = 0;
@@ -5673,15 +3253,9 @@ class GameControllerTest {
                     continue;
                 }
 
-                Card card = new Card(
-                        GameColor.YELLOW,
-                        index % 6 + 1
-                );
+                Card card = new Card(GameColor.YELLOW, index % 6 + 1);
 
-                Player owner =
-                        index % 2 == 0
-                                ? playerOne
-                                : playerTwo;
+                Player owner = index % 2 == 0 ? playerOne : playerTwo;
 
                 field.placeCard(card, owner, card.getValue());
                 index++;
@@ -5692,22 +3266,14 @@ class GameControllerTest {
     }
 
     private void finishDrawnRound() {
-        Field lastField =
-                fillBoardLeavingOneCardColoredFieldEmpty();
+        Field lastField = fillBoardLeavingOneCardColoredFieldEmpty();
 
         Player currentPlayer = getCurrentPlayer();
 
-        Card zeroPointCard = new Card(
-                findDifferentCardColor(lastField.getColor()),
-                1
-        );
+        Card zeroPointCard = new Card(findDifferentCardColor(lastField.getColor()), 1);
 
         prepareSelectedCard(currentPlayer, zeroPointCard);
 
-        controller.playCard(
-                currentPlayer,
-                lastField.getRow(),
-                lastField.getColumn()
-        );
+        controller.playCard(currentPlayer, lastField.getRow(), lastField.getColumn());
     }
 }

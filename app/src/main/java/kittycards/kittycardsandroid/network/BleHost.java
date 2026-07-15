@@ -594,7 +594,7 @@ public class BleHost {
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.BLUETOOTH_CONNECT
     })
-    public void closeHostedRoom() {
+    public void closeRoom() {
         networkManager.handler.post(() -> {
             if (
                     selectedGuestDevice == null

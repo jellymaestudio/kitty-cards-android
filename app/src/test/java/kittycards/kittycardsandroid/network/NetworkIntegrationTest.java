@@ -28,8 +28,6 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
-import android.os.Looper;
-import org.robolectric.Shadows;
 import org.robolectric.shadows.ShadowLooper;
 
 import java.lang.reflect.Field;
@@ -329,16 +327,16 @@ public class NetworkIntegrationTest {
     public void closeHostedRoom_asHost_sendsRoomClosedBeforeDisconnect() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
-        networkManager.closeHostedRoom();
-        verify(mockBleHost).closeHostedRoom();
+        networkManager.closeRoom();
+        verify(mockBleHost).closeRoom();
     }
 
     @Test
     public void closeHostedRoom_calledAsGuest_isIgnored() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
-        networkManager.closeHostedRoom();
-        verify(mockBleHost, never()).closeHostedRoom();
+        networkManager.closeRoom();
+        verify(mockBleHost, never()).closeRoom();
     }
 
     @Test
@@ -346,10 +344,10 @@ public class NetworkIntegrationTest {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
         setInternalField(host, "selectedGuestDevice", null);
-        
-        networkManager.closeHostedRoom();
+
+        networkManager.closeRoom();
         idle();
-        
+
         assertEquals(Role.NOT_CONNECTED, networkManager.getRole());
     }
 
@@ -375,11 +373,11 @@ public class NetworkIntegrationTest {
     public void stopRoomDiscovery_alreadyStopped_emitsWarning() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
-        setInternalField(host, "advertiser", null); 
-        
+        setInternalField(host, "advertiser", null);
+
         networkManager.stopRoomDiscovery();
         idle();
-        
+
         ArgumentCaptor<NetworkEvent> eventCaptor = ArgumentCaptor.forClass(NetworkEvent.class);
         verify(mockEventListener).onNetworkEvent(eventCaptor.capture());
         assertEquals(NetworkEvent.NetworkMessageType.WARNING, eventCaptor.getValue().type());
@@ -498,11 +496,11 @@ public class NetworkIntegrationTest {
         });
         t.start();
         t.interrupt();
-        
+
         try {
             t.join(1000);
         } catch (InterruptedException ignored) {}
-        
+
         assertTrue(interrupted.get());
     }
 
@@ -520,10 +518,10 @@ public class NetworkIntegrationTest {
     public void setGameConnectionListener_notifiedOnPartnerDisconnect() throws Exception {
         OnGameConnectionListener mockListener = mock(OnGameConnectionListener.class);
         networkManager.setGameConnectionListener(mockListener);
-        
+
         networkManager.notifyGamePartnerDisconnected();
         idle();
-        
+
         verify(mockListener).onGamePartnerDisconnected();
     }
 
@@ -531,12 +529,12 @@ public class NetworkIntegrationTest {
     public void setNetworkEventListener_receivesEventsFromBleHostAndBleGuest() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
-        
+
         java.lang.reflect.Method emitHost = host.getClass().getDeclaredMethod("emitEvent", NetworkEvent.NetworkMessageType.class, String.class);
         emitHost.setAccessible(true);
         emitHost.invoke(host, NetworkEvent.NetworkMessageType.INFO, "Host event");
         idle();
-        
+
         verify(mockEventListener).onNetworkEvent(any(NetworkEvent.class));
     }
 
@@ -555,7 +553,7 @@ public class NetworkIntegrationTest {
         assertEquals(Role.GUEST, networkManager.getRole());
         verify(mockAdvertiser).stopAdvertising(any(android.bluetooth.le.AdvertiseCallback.class));
     }
-    
+
     @Test
     @SuppressWarnings("unchecked")
     public void partnerDisconnectDuringGame_bothSidesNotifyGameConnectionListener() throws Exception {
@@ -568,7 +566,7 @@ public class NetworkIntegrationTest {
         BluetoothDevice mockSelectedDevice = mock(BluetoothDevice.class);
         when(mockSelectedDevice.getAddress()).thenReturn("00:11:22:33:44:55");
         setInternalField(host, "selectedGuestDevice", mockSelectedDevice);
-        
+
         android.bluetooth.BluetoothGattServerCallback hostCallback = (android.bluetooth.BluetoothGattServerCallback) getInternalField(host, "gattServerCallback");
         ((ArrayList<NetworkDevice>) getInternalField(host, "connectedGuests")).add(new NetworkDevice("Guest", "00:11:22:33:44:55"));
 
@@ -580,7 +578,7 @@ public class NetworkIntegrationTest {
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
         BleGuest guest = (BleGuest) getInternalField(networkManager, "bleGuest");
         setInternalField(guest, "connected", true);
-        
+
         android.bluetooth.BluetoothGattCallback guestCallback = (android.bluetooth.BluetoothGattCallback) getInternalField(guest, "gattCallback");
         guestCallback.onConnectionStateChange(mock(BluetoothGatt.class), 0, android.bluetooth.BluetoothProfile.STATE_DISCONNECTED);
         idle();
@@ -594,20 +592,20 @@ public class NetworkIntegrationTest {
     public void hostSelectGuest_thenGuestReceivesGuestAcceptedAction() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
-        
+
         NetworkDevice guestDevice = new NetworkDevice("Guest", "00:11:22:33:44:55");
         ((ArrayList<NetworkDevice>) getInternalField(host, "connectedGuests")).add(guestDevice);
-        
+
         BluetoothGattServer mockServer = mock(BluetoothGattServer.class);
         setInternalField(host, "bluetoothGattServer", mockServer);
         setInternalField(host, "serverCharacteristic", mock(BluetoothGattCharacteristic.class));
-        
+
         BluetoothDevice mockRemoteDevice = mock(BluetoothDevice.class);
         when(mockBluetoothAdapter.getRemoteDevice("00:11:22:33:44:55")).thenReturn(mockRemoteDevice);
-        
+
         networkManager.selectGuest(guestDevice);
         idle();
-        
+
         ArgumentCaptor<GameAction> actionCaptor = ArgumentCaptor.forClass(GameAction.class);
         verify(mockProtocolEngine).encodeGameAction(actionCaptor.capture());
         assertEquals(GameAction.ActionType.GUEST_ACCEPTED, actionCaptor.getValue().type());
@@ -623,21 +621,21 @@ public class NetworkIntegrationTest {
         idle(); // Ensure GATT server is started
 
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
-        
+
         BluetoothDevice mockGuestDevice = mock(BluetoothDevice.class);
         when(mockGuestDevice.getAddress()).thenReturn("00:11:22:33:44:55");
         setInternalField(host, "selectedGuestDevice", mockGuestDevice);
-        
+
         GameAction action = new GameAction(GameAction.ActionType.UNSELECT_CARD);
         when(mockProtocolEngine.decodeGameAction(any())).thenReturn(action);
-        
+
         // Mock characteristic with correct UUID
         BluetoothGattCharacteristic mockChar = mock(BluetoothGattCharacteristic.class);
         when(mockChar.getUuid()).thenReturn(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID);
 
         android.bluetooth.BluetoothGattServerCallback callback = (android.bluetooth.BluetoothGattServerCallback) getInternalField(host, "gattServerCallback");
         callback.onCharacteristicWriteRequest(mockGuestDevice, 1, mockChar, false, true, 0, new byte[6]);
-        
+
         GameAction received = networkManager.fetchNextAction();
         assertEquals(action, received);
     }
@@ -646,12 +644,12 @@ public class NetworkIntegrationTest {
     public void hostCloseHostedRoom_guestReceivesRoomClosedAction() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
-        
+
         setInternalField(host, "bluetoothGattServer", mock(BluetoothGattServer.class));
         setInternalField(host, "serverCharacteristic", mock(BluetoothGattCharacteristic.class));
         setInternalField(host, "selectedGuestDevice", mock(BluetoothDevice.class));
-        
-        networkManager.closeHostedRoom();
+
+        networkManager.closeRoom();
         idle();
         
         ArgumentCaptor<GameAction> actionCaptor = ArgumentCaptor.forClass(GameAction.class);

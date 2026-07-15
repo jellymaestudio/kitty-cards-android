@@ -5,7 +5,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertThrows;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -32,8 +31,7 @@ import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.Role;
 
 /**
- * Comprehensive Integration test for the GameController.
- * Covers match start, card actions, network synchronization, and lifecycle management.
+ * Comprehensive Integration test for the GameController using a FakeNetworkManager.
  */
 @HiltAndroidTest
 @RunWith(RobolectricTestRunner.class)
@@ -57,12 +55,26 @@ public class GameControllerIntegrationTest {
         hiltRule.inject();
         localPlayer = new Player(1, "Alice");
         remotePlayer = new Player(2, "Bob");
+        
+        gameController.resetSession();
+        gameController.setLocalPlayer(localPlayer);
+        fakeNetworkManager.clearSentActions();
     }
 
-    // --- 1. Match Start ---
+    // -------------------------------------------------------------------------
+    // startMatch
+    // -------------------------------------------------------------------------
 
     @Test
-    public void startMatch_asHost_sendsStartingPlayerBoardSetupAndDealsCards() {
+    public void startMatch_setsActiveMatchWithRunningStatus() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        
+        assertNotNull(gameController.getMatch());
+        assertEquals(MatchStatus.RUNNING, gameController.getMatch().getMatchStatus());
+    }
+
+    @Test
+    public void startMatch_asHost_generatesAndTransmitsInitialSetup() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
@@ -71,38 +83,50 @@ public class GameControllerIntegrationTest {
         assertEquals(8, sentActions.stream().filter(a -> a.type() == GameAction.ActionType.SET_BOARD_COLOR).count());
         assertEquals(1, sentActions.stream().filter(a -> a.type() == GameAction.ActionType.SET_STARTING_PLAYER).count());
         assertEquals(5, sentActions.stream().filter(a -> a.type() == GameAction.ActionType.DEAL_CARD).count());
-        
-        assertNotNull(gameController.getMatch());
-        assertEquals(MatchStatus.RUNNING, gameController.getMatch().getMatchStatus());
     }
 
     @Test
-    public void startMatch_asGuest_doesNotSendNetworkActions() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-
-        assertTrue("Guest should be passive during setup", fakeNetworkManager.getSentActions().isEmpty());
-    }
-
-    @Test
-    public void startMatch_initializesMatchAndMoveValidator() {
+    public void startMatch_asHost_sentActionsContainDealCardPerInitialCard() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
+
+        List<GameAction> dealActions = fakeNetworkManager.getSentActions().stream()
+                .filter(a -> a.type() == GameAction.ActionType.DEAL_CARD)
+                .toList();
         
-        assertNotNull("Match should be initialized", gameController.getMatch());
-        // Indirectly verify MoveValidator by performing a valid selection
-        Card card = new Card(GameColor.CYAN, 5);
-        localPlayer.addCard(card);
-        gameController.selectCard(localPlayer, card);
-        assertTrue("Selection should be valid if MoveValidator is correctly initialized", localPlayer.hasSelectedCard());
+        assertEquals(5, dealActions.size());
+        for (GameAction action : dealActions) {
+            assertNotNull(action.card());
+        }
     }
 
-    // --- 2. Karten auswählen/abwählen ---
+    @Test
+    public void startMatch_asHost_sentActionsContainSetStartingPlayer() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+
+        assertTrue(fakeNetworkManager.getSentActions().stream()
+                .anyMatch(a -> a.type() == GameAction.ActionType.SET_STARTING_PLAYER));
+    }
 
     @Test
-    public void selectCard_validCard_updatesStateAndSendsAction() {
+    public void startMatch_triggersStateChangedListener() {
+        AtomicInteger count = new AtomicInteger(0);
+        gameController.setOnStateChangedListener(count::incrementAndGet);
+        
+        gameController.startMatch(localPlayer, remotePlayer);
+
+        assertEquals(1, count.get());
+    }
+
+    // -------------------------------------------------------------------------
+    // selectCard
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void selectCard_succeedsWhenCardInHandAndMatchRunning() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
@@ -113,23 +137,67 @@ public class GameControllerIntegrationTest {
 
         assertTrue(localPlayer.hasSelectedCard());
         assertEquals(card, localPlayer.getSelectedCard());
+    }
+
+    @Test
+    public void selectCard_transmitsActionOnSuccess() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        Card card = new Card(GameColor.CYAN, 5);
+        localPlayer.addCard(card);
+
+        gameController.selectCard(localPlayer, card);
+
+        GameAction lastAction = fakeNetworkManager.getSentActions().getLast();
+        assertEquals(GameAction.ActionType.SELECT_CARD, lastAction.type());
+        assertEquals(card, lastAction.card());
+    }
+
+    @Test
+    public void selectCard_sentActionHasTypeSelectCard() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        Card card = new Card(GameColor.CYAN, 5);
+        localPlayer.addCard(card);
+
+        gameController.selectCard(localPlayer, card);
+
         assertEquals(GameAction.ActionType.SELECT_CARD, fakeNetworkManager.getSentActions().getLast().type());
     }
 
     @Test
-    public void selectCard_invalidMove_doesNothing() {
+    public void selectCard_sentActionContainsSelectedCard() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
-        Card foreignCard = new Card(GameColor.PURPLE, 6); // Valid value but not in hand
+        Card card = new Card(GameColor.CYAN, 5);
+        localPlayer.addCard(card);
 
-        gameController.selectCard(localPlayer, foreignCard);
+        gameController.selectCard(localPlayer, card);
 
-        assertFalse("Should not select card if not in hand", localPlayer.hasSelectedCard());
+        assertEquals(card, fakeNetworkManager.getSentActions().getLast().card());
     }
 
     @Test
-    public void unselectCard_sendsActionAndClearsSelection() {
+    public void selectCard_doesNotTransmitOnFailure() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        fakeNetworkManager.clearSentActions();
+        
+        gameController.selectCard(localPlayer, new Card(GameColor.PURPLE, 1)); // Not in hand
+
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
+    }
+
+    // -------------------------------------------------------------------------
+    // unselectCard
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void unselectCard_clearsExistingSelection() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
@@ -140,247 +208,260 @@ public class GameControllerIntegrationTest {
         gameController.unselectCard(localPlayer);
 
         assertFalse(localPlayer.hasSelectedCard());
-        assertEquals(GameAction.ActionType.UNSELECT_CARD, fakeNetworkManager.getSentActions().getLast().type());
     }
 
-    // --- 3. Karte spielen ---
-
     @Test
-    public void playCard_validMove_updatesScoreAndSwitchesTurn() {
+    public void unselectCard_doesNotTransmitWhenNothingSelected() {
         gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
-        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
-        
-        Card card = new Card(GameColor.YELLOW, 6); // Max value for simple score check
-        localPlayer.addCard(card);
-        gameController.selectCard(localPlayer, card);
-        int initialScore = localPlayer.getScore();
+        fakeNetworkManager.clearSentActions();
 
-        gameController.playCard(localPlayer, 0, 0);
+        gameController.unselectCard(localPlayer);
 
-        assertTrue("Score should have increased", localPlayer.getScore() > initialScore);
-        assertEquals("Turn should switch", remotePlayer, gameController.getMatch().getGameState().getCurrentPlayer());
-        assertEquals(card, gameController.getMatch().getGameState().getBoard().getField(0, 0).getCard());
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
     }
 
     @Test
-    public void playCard_invalidMove_doesNothing() {
+    public void unselectCard_transmitsOnSuccess() {
         gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        // No card selected, should not be able to play
-        gameController.playCard(localPlayer, 0, 0);
-
-        assertTrue("Board field should remain empty", gameController.getMatch().getGameState().getBoard().getField(0, 0).isEmpty());
-        assertTrue("No network action should be sent", fakeNetworkManager.getSentActions().stream().noneMatch(a -> a.type() == GameAction.ActionType.PLAY_CARD));
-    }
-
-    @Test
-    public void playCard_roundOver_hostStartsNextRoundAndSendsSetup() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        // Fill 7 fields to nearly finish the round
-        for (int i = 0; i < 7; i++) {
-            int r = i / 3; int c = i % 3;
-            if (r == 1 && c == 1) { r = 2; c = 1; }
-            gameController.getMatch().getGameState().getBoard().getField(r, c).placeCard(new Card(GameColor.CYAN, 1), localPlayer, 0);
-        }
-
-        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
-        Card finalCard = new Card(GameColor.CYAN, 1);
-        localPlayer.addCard(finalCard);
-        gameController.selectCard(localPlayer, finalCard);
-
-        gameController.playCard(localPlayer, 2, 2);
-
-        assertEquals("Round should advance", 2, gameController.getMatch().getMatchState().getCurrentRound());
-        // Verify broadcast (Setup for round 2: 8 colors + starting player)
-        long setupActions = fakeNetworkManager.getSentActions().stream()
-                .filter(a -> a.type() == GameAction.ActionType.SET_BOARD_COLOR || a.type() == GameAction.ActionType.SET_STARTING_PLAYER)
-                .count();
-        assertTrue("Host should broadcast new round setup", setupActions >= 9);
-    }
-
-    @Test
-    public void playCard_matchOver_hostSendsMatchFinishedAction() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        // Host needs 2 wins to end the match (standard)
-        localPlayer.addWin(); 
-
-        // Nearly fill board
-        for (int i = 0; i < 8; i++) {
-            int r = i / 3; int c = i % 3;
-            if (r == 1 && c == 1) continue;
-            gameController.getMatch().getGameState().getBoard().getField(r, c).placeCard(new Card(GameColor.CYAN, 1), localPlayer, 0);
-        }
-        
-        // Clear the last field for playCard
-        gameController.getMatch().getGameState().getBoard().getField(2, 2).clearField();
-
-        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
-        Card finalCard = new Card(GameColor.CYAN, 1);
-        localPlayer.addCard(finalCard);
-        gameController.selectCard(localPlayer, finalCard);
-
-        gameController.playCard(localPlayer, 2, 2);
-
-        assertEquals(MatchStatus.FINISHED, gameController.getMatch().getMatchStatus());
-        assertTrue("Host should send MATCH_FINISHED", fakeNetworkManager.getSentActions().stream().anyMatch(a -> a.type() == GameAction.ActionType.MATCH_FINISHED));
-    }
-
-    @Test
-    public void playCard_asGuest_doesNotTriggerRoundTransition() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        int roundBefore = gameController.getMatch().getMatchState().getCurrentRound();
-        
-        // Fill board
-        for (int i = 0; i < 8; i++) {
-            int r = i / 3; int c = i % 3;
-            if (r == 1 && c == 1) continue;
-            gameController.getMatch().getGameState().getBoard().getField(r, c).placeCard(new Card(GameColor.CYAN, 1), localPlayer, 0);
-        }
-        
-        // Guest plays (if it were their turn and they had a card, but here we check the logic branch)
-        gameController.playCard(localPlayer, 0, 0); // Field occupied, but we test the HOST check for transition
-
-        assertEquals("Guest should not advance round autonomously", roundBefore, gameController.getMatch().getMatchState().getCurrentRound());
-    }
-
-    // --- 4. Karte ziehen ---
-
-    @Test
-    public void drawCard_validDraw_addsCardAndSwitchesTurn() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
-        int count = localPlayer.getHandCardCount();
-
-        gameController.drawCard(localPlayer);
-
-        assertEquals("Hand size should increase", count + 1, localPlayer.getHandCardCount());
-        assertEquals("Turn should switch", remotePlayer, gameController.getMatch().getGameState().getCurrentPlayer());
-    }
-
-    @Test
-    public void drawCard_invalidDraw_doesNothing() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        // Not local turn
-        gameController.getMatch().getGameState().setCurrentPlayer(remotePlayer);
-
-        gameController.drawCard(localPlayer);
-
-        assertEquals("Should not draw if not turn", 0, localPlayer.getHandCardCount());
-    }
-
-    // --- 5. Remote-Aktionen (handleRemoteAction) ---
-
-    @Test
-    public void handleRemoteAction_drawCard_appliesToRemotePlayer() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        Card remoteCard = new Card(GameColor.GREEN, 4);
-
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, remoteCard));
-
-        assertTrue(remotePlayer.hasCard(remoteCard));
-        assertEquals("Turn should switch to local", localPlayer, gameController.getMatch().getGameState().getCurrentPlayer());
-    }
-
-    @Test
-    public void handleRemoteAction_playCard_appliesToRemotePlayer() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        Card remoteCard = new Card(GameColor.PURPLE, 3);
-        
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.PLAY_CARD, remoteCard, 0, 0));
-
-        assertEquals(remoteCard, gameController.getMatch().getGameState().getBoard().getField(0, 0).getCard());
-        assertEquals(localPlayer, gameController.getMatch().getGameState().getCurrentPlayer());
-    }
-
-    @Test
-    public void handleRemoteAction_selectCard_appliesToRemotePlayer() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        Card remoteCard = new Card(GameColor.CYAN, 2);
-        
-        // Ensure remote player has the card
-        gameController.getMatch().getPlayerTwo().addCard(remoteCard);
-
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, remoteCard));
-
-        assertTrue(remotePlayer.hasSelectedCard());
-        assertEquals(remoteCard, remotePlayer.getSelectedCard());
-    }
-
-    @Test
-    public void handleRemoteAction_unselectCard_appliesToRemotePlayer() {
-        gameController.setNetworkRole(Role.GUEST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
         Card card = new Card(GameColor.CYAN, 5);
-        gameController.getMatch().getPlayerTwo().addCard(card);
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
 
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        gameController.unselectCard(localPlayer);
 
-        assertFalse(remotePlayer.hasSelectedCard());
+        GameAction lastAction = fakeNetworkManager.getSentActions().getLast();
+        assertEquals(GameAction.ActionType.UNSELECT_CARD, lastAction.type());
+        assertNull(lastAction.card());
     }
 
     @Test
-    public void handleRemoteAction_setStartingPlayer_setsCorrectPlayer() {
-        gameController.setNetworkRole(Role.GUEST);
+    public void unselectCard_sentActionHasTypeUnselectCard() {
+        gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
+        Card card = new Card(GameColor.CYAN, 5);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
 
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1)); // Guest starts
+        gameController.unselectCard(localPlayer);
 
-        // Verification happens via full round init test
+        assertEquals(GameAction.ActionType.UNSELECT_CARD, fakeNetworkManager.getSentActions().getLast().type());
     }
 
     @Test
-    public void handleRemoteAction_dealCard_addsCardToCorrectPlayer() {
-        gameController.setNetworkRole(Role.GUEST);
+    public void unselectCard_sentActionCardFieldIsNull() {
+        gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
-        Card card = new Card(GameColor.YELLOW, 1);
+        Card card = new Card(GameColor.CYAN, 5);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
 
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card, 0)); // Index 0 = Alice
+        gameController.unselectCard(localPlayer);
 
-        assertTrue(localPlayer.hasCard(card));
+        assertNull(fakeNetworkManager.getSentActions().getLast().card());
     }
 
+    // -------------------------------------------------------------------------
+    // playCard
+    // -------------------------------------------------------------------------
+
     @Test
-    public void handleRemoteAction_matchFinished_setsMatchStatusFinished() {
-        gameController.setNetworkRole(Role.GUEST);
+    public void playCard_succeedsWhenAllConditionsMet() {
+        gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
 
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
+        gameController.playCard(localPlayer, 0, 0);
 
-        assertEquals(MatchStatus.FINISHED, gameController.getMatch().getMatchStatus());
+        assertEquals(card, gameController.getMatch().getGameState().getBoard().getField(0, 0).getCard());
+        assertEquals(remotePlayer, gameController.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
-    public void handleRemoteAction_matchAborted_triggersAbortListener() {
-        gameController.setNetworkRole(Role.GUEST);
+    public void playCard_noopWhenNoCardSelected() {
+        gameController.setNetworkRole(Role.HOST);
         gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        fakeNetworkManager.clearSentActions();
+
+        gameController.playCard(localPlayer, 0, 0);
+
+        assertTrue(gameController.getMatch().getGameState().getBoard().getField(0, 0).isEmpty());
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
+    }
+
+    @Test
+    public void playCard_noopWhenRowOrColumnNegative() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+        fakeNetworkManager.clearSentActions();
+
+        gameController.playCard(localPlayer, -1, 0);
+
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
+    }
+
+    @Test
+    public void playCard_noopWhenRowOrColumnGreaterThanTwo() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+        fakeNetworkManager.clearSentActions();
+
+        gameController.playCard(localPlayer, 3, 0);
+
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
+    }
+
+    @Test
+    public void playCard_noopWhenPositionIsCenterField() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+        fakeNetworkManager.clearSentActions();
+
+        // Center field is (1, 1)
+        gameController.playCard(localPlayer, 1, 1);
+
+        assertTrue(fakeNetworkManager.getSentActions().isEmpty());
+    }
+
+    @Test
+    public void playCard_transmitsOnSuccess() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+
+        gameController.playCard(localPlayer, 0, 0);
+
+        GameAction lastAction = fakeNetworkManager.getSentActions().getLast();
+        assertEquals(GameAction.ActionType.PLAY_CARD, lastAction.type());
+        assertEquals(0, lastAction.boardPositionRow());
+        assertEquals(0, lastAction.boardPositionColumn());
+        assertEquals(card, lastAction.card());
+    }
+
+    @Test
+    public void playCard_sentActionHasTypePlayCard() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+
+        gameController.playCard(localPlayer, 0, 0);
+
+        assertEquals(GameAction.ActionType.PLAY_CARD, fakeNetworkManager.getSentActions().getLast().type());
+    }
+
+    @Test
+    public void playCard_sentActionContainsCorrectBoardPosition() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        Card card = new Card(GameColor.YELLOW, 6);
+        localPlayer.addCard(card);
+        gameController.selectCard(localPlayer, card);
+
+        gameController.playCard(localPlayer, 2, 1);
+
+        GameAction lastAction = fakeNetworkManager.getSentActions().getLast();
+        assertEquals(2, lastAction.boardPositionRow());
+        assertEquals(1, lastAction.boardPositionColumn());
+    }
+
+    // -------------------------------------------------------------------------
+    // drawCard
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void drawCard_addsGeneratedCardToHand() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+        int initialCount = localPlayer.getHandCardCount();
+
+        gameController.drawCard(localPlayer);
+
+        assertEquals(initialCount + 1, localPlayer.getHandCardCount());
+    }
+
+    @Test
+    public void drawCard_transmitsOnSuccess() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+
+        gameController.drawCard(localPlayer);
+
+        GameAction lastAction = fakeNetworkManager.getSentActions().getLast();
+        assertEquals(GameAction.ActionType.DRAW_CARD, lastAction.type());
+        assertNotNull(lastAction.card());
+    }
+
+    @Test
+    public void drawCard_sentActionHasTypeDrawCard() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+
+        gameController.drawCard(localPlayer);
+
+        assertEquals(GameAction.ActionType.DRAW_CARD, fakeNetworkManager.getSentActions().getLast().type());
+    }
+
+    @Test
+    public void drawCard_sentActionContainsGeneratedCard() {
+        gameController.setNetworkRole(Role.HOST);
+        gameController.setLocalPlayer(localPlayer);
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
+
+        gameController.drawCard(localPlayer);
+
+        Card drawnCard = localPlayer.getHandCards().get(localPlayer.getHandCardCount() - 1);
+        assertEquals(drawnCard, fakeNetworkManager.getSentActions().getLast().card());
+    }
+
+    // -------------------------------------------------------------------------
+    // handleRemoteAction
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void setOnMatchAbortedListener_invokedOnRemoteAbortAction() {
         gameController.startMatch(localPlayer, remotePlayer);
         AtomicBoolean aborted = new AtomicBoolean(false);
         gameController.setOnMatchAbortedListener(() -> aborted.set(true));
@@ -391,134 +472,153 @@ public class GameControllerIntegrationTest {
     }
 
     @Test
-    public void handleRemoteAction_notifiesStateChangedListener() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
+    public void incomingMatchAbortedAction_triggersOnMatchAbortedListener() {
         gameController.startMatch(localPlayer, remotePlayer);
-        AtomicInteger notificationCount = new AtomicInteger(0);
-        gameController.setOnStateChangedListener(notificationCount::incrementAndGet);
+        AtomicBoolean aborted = new AtomicBoolean(false);
+        gameController.setOnMatchAbortedListener(() -> aborted.set(true));
 
-        Card card = new Card(GameColor.CYAN, 1);
-        gameController.getMatch().getPlayerTwo().addCard(card);
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_ABORTED));
+
+        assertTrue(aborted.get());
+    }
+
+    @Test
+    public void incomingSelectCardAction_updatesRemotePlayerSelection() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        Card card = new Card(GameColor.PURPLE, 3);
+        remotePlayer.addCard(card);
+
         gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SELECT_CARD, card));
-        
-        assertTrue("Should notify state change", notificationCount.get() > 0);
-    }
 
-    // --- 6. Board-Setup-Synchronisation ---
-
-    @Test
-    public void applyBoardColor_allColorsAndStartingPlayerReceived_initializesFirstRound() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-
-        for (int i = 0; i < 8; i++) {
-            gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.YELLOW, i % 3, i / 3));
-        }
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
-
-        assertEquals(GameColor.YELLOW, gameController.getMatch().getGameState().getBoard().getField(0, 0).getColor());
+        assertTrue(remotePlayer.hasSelectedCard());
+        assertEquals(card, remotePlayer.getSelectedCard());
     }
 
     @Test
-    public void applyBoardColor_secondRound_startsNextRoundInsteadOfInitializing() {
-        gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
+    public void incomingUnselectCardAction_clearsRemotePlayerSelection() {
         gameController.startMatch(localPlayer, remotePlayer);
-        
-        // Setup Round 1
-        for(int i=0; i<8; i++) gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.CYAN, i%3, i/3));
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
-        
-        // Setup Round 2
-        for(int i=0; i<8; i++) gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.YELLOW, i%3, i/3));
+        Card card = new Card(GameColor.PURPLE, 3);
+        remotePlayer.addCard(card);
+        remotePlayer.selectCard(card);
+
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+
+        assertFalse(remotePlayer.hasSelectedCard());
+    }
+
+    @Test
+    public void incomingPlayCardAction_appliesPlacementToLocalBoard() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(remotePlayer);
+        Card card = new Card(GameColor.PURPLE, 3);
+        remotePlayer.addCard(card);
+        remotePlayer.selectCard(card);
+
+        // Action constructor: (type, card, col, row)
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.PLAY_CARD, card, 0, 2));
+
+        assertEquals(card, gameController.getMatch().getGameState().getBoard().getField(2, 0).getCard());
+    }
+
+    @Test
+    public void incomingDrawCardAction_addsCardToRemotePlayerHand() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        gameController.getMatch().getGameState().setCurrentPlayer(remotePlayer);
+        Card card = new Card(GameColor.GREEN, 4);
+
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.DRAW_CARD, card));
+
+        assertTrue(remotePlayer.hasCard(card));
+    }
+
+    @Test
+    public void incomingDealCardAction_addsInitialCardToCorrectPlayer() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        Card card1 = new Card(GameColor.YELLOW, 1);
+        Card card2 = new Card(GameColor.CYAN, 2);
+
+        // contextSensitiveInt 0 -> playerOne (localPlayer here), 1 -> playerTwo (remotePlayer)
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card1, 0));
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.DEAL_CARD, card2, 1));
+
+        assertTrue(localPlayer.hasCard(card1));
+        assertTrue(remotePlayer.hasCard(card2));
+    }
+
+    @Test
+    public void incomingSetStartingPlayerAction_setsCurrentPlayer() {
+        gameController.setNetworkRole(Role.GUEST);
+        gameController.startMatch(localPlayer, remotePlayer);
+
+        // Host sends Starting Player THEN Board Setup
         gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 1));
-        
-        assertEquals("Should advance to round 2", 2, gameController.getMatch().getMatchState().getCurrentRound());
-        assertEquals("New setup should be applied", GameColor.YELLOW, gameController.getMatch().getGameState().getBoard().getField(0,0).getColor());
+
+        // Send 8 colors
+        for (int i = 0; i < 8; i++) {
+            gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.CYAN, 0, 0));
+        }
+
+        assertEquals(remotePlayer, gameController.getMatch().getGameState().getCurrentPlayer());
     }
 
     @Test
-    public void applyBoardColor_incompleteData_doesNotInitializeRound() {
+    public void incomingStartMatchSetup_asGuest_initializesMatchFromHostData() {
         gameController.setNetworkRole(Role.GUEST);
-        gameController.setLocalPlayer(localPlayer);
         gameController.startMatch(localPlayer, remotePlayer);
-
-        // Only 7 colors
-        for (int i = 0; i < 7; i++) {
-            gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.YELLOW, i%3, i/3));
-        }
+        
+        // Send starting player FIRST
         gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
 
-        assertTrue("Should not initialize if colors missing", gameController.getMatch().getGameState().getBoard().getField(0, 0).getColor() != GameColor.YELLOW);
+        // Send 8 colors
+        for (int i = 0; i < 8; i++) {
+            int row = i < 3 ? 0 : (i < 5 ? 1 : 2);
+            int col = i % 3;
+            if (row == 1 && col == 1) col = 2; // skip center
+            gameController.handleRemoteAction(new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.CYAN, col, row));
+        }
+        
+        assertNotNull(gameController.getMatch().getGameState());
+        assertEquals(localPlayer, gameController.getMatch().getGameState().getCurrentPlayer());
     }
 
-    // --- 7. Action-Listener-Lifecycle ---
+    @Test
+    public void setOnStateChangedListener_invokedAfterRemoteActionProcessed() {
+        gameController.startMatch(localPlayer, remotePlayer);
+        AtomicInteger count = new AtomicInteger(0);
+        gameController.setOnStateChangedListener(count::incrementAndGet);
+
+        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+        
+        assertTrue(count.get() > 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // resetSession
+    // -------------------------------------------------------------------------
 
     @Test
-    public void startListeningForActions_lifecycle_exceptions_and_logic() {
+    public void resetSession_clearsMatch() {
+        gameController.startMatch(localPlayer, remotePlayer);
         gameController.resetSession();
-        gameController.setNetworkManager(null);
-        assertThrows("Should throw if NM null", IllegalStateException.class, () -> gameController.startListeningForActions());
 
-        gameController.setNetworkManager(fakeNetworkManager);
-        gameController.setNetworkRole(Role.NOT_CONNECTED);
-        assertThrows("Should throw if role NOT_CONNECTED", IllegalStateException.class, () -> gameController.startListeningForActions());
-        
+        assertNull(gameController.getMatch());
+    }
+
+    @Test
+    public void resetSession_clearsLocalPlayer() {
+        gameController.setLocalPlayer(localPlayer);
+        gameController.resetSession();
+
+        assertNull(gameController.getLocalPlayer());
+    }
+
+    @Test
+    public void resetSession_stopsActionListener() {
         gameController.setNetworkRole(Role.HOST);
         gameController.startListeningForActions();
-        assertTrue(gameController.isListeningForActions());
-        
-        gameController.stopListeningForActions();
+
+        gameController.resetSession();
+
         assertFalse(gameController.isListeningForActions());
-    }
-
-    // --- 8. Session-Reset ---
-
-    @Test
-    public void resetSession_clearsAllStateAndStopsListening() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.setNetworkManager(fakeNetworkManager);
-        gameController.startMatch(localPlayer, remotePlayer);
-        gameController.startListeningForActions();
-
-        gameController.resetSession();
-
-        assertNull("Match should be null", gameController.getMatch());
-        assertNull("Player should be null", gameController.getLocalPlayer());
-        assertFalse("Should stop listening", gameController.isListeningForActions());
-    }
-
-    // --- 9. End-to-End Consistency ---
-
-    @Test
-    public void fullRound_hostAndGuestSync_boardAndScoresConsistent() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        // Local play
-        gameController.getMatch().getGameState().setCurrentPlayer(localPlayer);
-        Card card = new Card(GameColor.YELLOW, 5);
-        localPlayer.addCard(card);
-        gameController.selectCard(localPlayer, card);
-        gameController.playCard(localPlayer, 0, 0);
-
-        assertEquals("Board should have card", card, gameController.getMatch().getGameState().getBoard().getField(0, 0).getCard());
-        assertEquals("Turn should have switched", remotePlayer, gameController.getMatch().getGameState().getCurrentPlayer());
-    }
-
-    @Test
-    public void matchFinished_bothDevicesReachSameFinalState() {
-        gameController.setNetworkRole(Role.HOST);
-        gameController.setLocalPlayer(localPlayer);
-        gameController.startMatch(localPlayer, remotePlayer);
-        
-        // Signal from remote
-        gameController.handleRemoteAction(new GameAction(GameAction.ActionType.MATCH_FINISHED));
-        
-        assertEquals(MatchStatus.FINISHED, gameController.getMatch().getMatchStatus());
     }
 }

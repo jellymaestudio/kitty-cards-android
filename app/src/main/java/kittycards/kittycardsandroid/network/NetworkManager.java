@@ -147,7 +147,7 @@ public class NetworkManager implements INetworkManager {
             return;
         }
 
-        bleHost.closeHostedRoom();
+        bleHost.closeRoom();
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
