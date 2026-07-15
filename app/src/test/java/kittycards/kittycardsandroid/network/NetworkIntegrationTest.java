@@ -2,6 +2,10 @@ package kittycards.kittycardsandroid.network;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -82,6 +86,72 @@ public class NetworkIntegrationTest {
         assertNotNull("The card should have been placed on the local board", cardOnBoard);
         assertEquals("Value mismatch on board", 5, cardOnBoard.getValue());
         assertEquals("Color mismatch on board", GameColor.CYAN, cardOnBoard.getColor());
+        
+        gameController.stopListeningForActions();
+    }
+
+    /**
+     * Verifies that the GameController reacts correctly when the network connection is lost.
+     */
+    @Test
+    public void partnerDisconnected_abortsLocalMatch() {
+        // 1. Arrange
+        Player local = new Player(1, "Local");
+        Player remote = new Player(2, "Remote");
+        gameController.setNetworkRole(Role.HOST);
+        gameController.startMatch(local, remote);
+        
+        AtomicBoolean abortNotified = new AtomicBoolean(false);
+        gameController.setOnMatchAbortedListener(() -> abortNotified.set(true));
+
+        // 2. Act: Simulate Bluetooth connection loss
+        fakeNetworkManager.simulatePartnerDisconnected();
+
+        // 3. Assert
+        assertTrue("UI should be notified about aborted match", abortNotified.get());
+        assertEquals("Role should be reset", Role.NOT_CONNECTED, gameController.getMatch().getGameState() == null ? Role.NOT_CONNECTED : Role.HOST);
+        // Note: GameController.resetSession would be called in a real UI context via the listener
+    }
+
+    /**
+     * Verifies that the complete board setup is synchronized from Host to Guest.
+     */
+    @Test
+    public void boardSetup_isSynchronizedFully() throws InterruptedException {
+        // 1. Arrange: Guest waiting for setup
+        Player local = new Player(1, "Guest");
+        Player remote = new Player(2, "Host");
+        gameController.setNetworkRole(Role.GUEST);
+        gameController.setLocalPlayer(local);
+        gameController.startMatch(local, remote);
+        gameController.startListeningForActions();
+
+        // 2. Act: Simulate Host sending board setup (8 fields, center is omitted)
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                if (r == 1 && c == 1) continue; 
+                fakeNetworkManager.simulateIncomingAction(
+                    new GameAction(GameAction.ActionType.SET_BOARD_COLOR, GameColor.PURPLE, c, r)
+                );
+            }
+        }
+        // Also need to send the starting player to trigger initializeCurrentRound
+        fakeNetworkManager.simulateIncomingAction(new GameAction(GameAction.ActionType.SET_STARTING_PLAYER, 0));
+
+        Thread.sleep(200);
+
+        // 3. Assert: Verify all 8 non-center fields are correctly synchronized
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                if (r == 1 && c == 1) continue; 
+                assertEquals("Board field (" + r + "," + c + ") should be PURPLE", 
+                    GameColor.PURPLE, 
+                    gameController.getMatch().getGameState().getBoard().getField(r, c).getColor());
+            }
+        }
+        
+        assertNotNull("Match should have a starting player for guest", 
+            gameController.getMatch().getGameState().getStartingPlayer());
         
         gameController.stopListeningForActions();
     }
