@@ -142,7 +142,7 @@ public class NetworkManager implements INetworkManager {
             Manifest.permission.BLUETOOTH_CONNECT
     })
     @Override
-    public void closeHostedRoom() {
+    public void closeRoom() {
         if (role != Role.HOST) {
             return;
         }

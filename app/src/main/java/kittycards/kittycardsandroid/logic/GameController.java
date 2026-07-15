@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -28,8 +29,7 @@ import kittycards.kittycardsandroid.network.Role;
  * updating the game state, handling turn changes and coordinating
  * network communication between connected devices.
  * <p>
- * Implemented as a singleton to provide a single shared controller
- * instance throughout the application.
+ * A shared controller instance is provided throughout the application.
  *
  * @author JellyMae
  */
@@ -44,7 +44,7 @@ public class GameController implements IGameController {
     private final List<GameColor> receivedBoardColors = new ArrayList<>();
     private Player receivedStartingPlayer;
     private MoveValidator moveValidator;
-    private INetworkManager networkManager;
+    private final INetworkManager networkManager;
     private Runnable onStateChangedListener;
     private Runnable onMatchAbortedListener;
     private static final int STARTING_PLAYER_INITIAL_CARDS = 2;
@@ -69,8 +69,19 @@ public class GameController implements IGameController {
      *
      * @return the active match
      */
+    @Override
     public Match getMatch() {
         return match;
+    }
+
+    /**
+     * Returns the player controlled by the local device.
+     *
+     * @return the local player
+     */
+    @Override
+    public Player getLocalPlayer() {
+        return localPlayer;
     }
 
     /**
@@ -78,6 +89,7 @@ public class GameController implements IGameController {
      *
      * @param localPlayer the local player
      */
+    @Override
     public void setLocalPlayer(Player localPlayer) {
         this.localPlayer = localPlayer;
     }
@@ -87,17 +99,9 @@ public class GameController implements IGameController {
      *
      * @return the remote player
      */
+    @Override
     public Player getRemotePlayer() {
         return match.getOtherPlayer(localPlayer);
-    }
-
-    /**
-     * Returns the player controlled by the local device.
-     *
-     * @return the local player
-     */
-    public Player getLocalPlayer() {
-        return localPlayer;
     }
 
 
@@ -106,17 +110,9 @@ public class GameController implements IGameController {
         this.onStateChangedListener = listener;
     }
 
+    @Override
     public void setOnMatchAbortedListener(Runnable listener) {
         this.onMatchAbortedListener = listener;
-    }
-
-    /**
-     * Sets the NetworkManager used for sending and receiving game actions.
-     *
-     * @param networkManager the network manager
-     */
-    public void setNetworkManager(INetworkManager networkManager) {
-        this.networkManager = networkManager;
     }
 
     /**
@@ -124,8 +120,12 @@ public class GameController implements IGameController {
      *
      * @param role the network role
      */
+    @Override
     public void setNetworkRole(Role role) {
-        this.role = role;
+        this.role = Objects.requireNonNull(
+                role,
+                "role cannot be null"
+        );
     }
 
     /**
@@ -133,6 +133,7 @@ public class GameController implements IGameController {
      *
      * @return true if the action listener is running
      */
+    @Override
     public boolean isListeningForActions() {
         return listeningForActions;
     }
@@ -167,7 +168,12 @@ public class GameController implements IGameController {
 
     @Override
     public void unselectCard(Player player) {
+        if (!moveValidator.canUnselectCard(player)) {
+            return;
+        }
+
         sendGameAction(new GameAction(GameAction.ActionType.UNSELECT_CARD));
+
         applyUnselectCard(player);
         notifyStateChanged();
     }
@@ -221,15 +227,10 @@ public class GameController implements IGameController {
      * @throws IllegalStateException if the controller has not been configured
      *                               for a network match
      */
+    @Override
     public synchronized void startListeningForActions() {
         if (listeningForActions) {
             return;
-        }
-
-        if (networkManager == null) {
-            throw new IllegalStateException(
-                    "NetworkManager must be set before starting the action listener"
-            );
         }
 
         if (role == Role.NOT_CONNECTED) {
@@ -291,6 +292,7 @@ public class GameController implements IGameController {
      * <p>The listener thread is interrupted so that a blocking
      * fetchNextAction() call returns immediately.</p>
      */
+    @Override
     public synchronized void stopListeningForActions() {
         listeningForActions = false;
 
@@ -306,6 +308,7 @@ public class GameController implements IGameController {
      * <p>This method must be called when a match ends or is aborted,
      * before another lobby or match session is started.</p>
      */
+    @Override
     public synchronized void resetSession() {
         stopListeningForActions();
 
@@ -321,7 +324,6 @@ public class GameController implements IGameController {
 
         onStateChangedListener = null;
         onMatchAbortedListener = null;
-        networkManager = null;
     }
 
     /**
@@ -549,9 +551,7 @@ public class GameController implements IGameController {
 
     @SuppressLint("MissingPermission")
     private void sendGameAction(GameAction action) {
-        if (networkManager != null) {
-            networkManager.sendGameChange(action);
-        }
+        networkManager.sendGameChange(action);
     }
 
     private void sendBoardSetup() {

@@ -24,7 +24,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kittycards.kittycardsandroid.components.IGameController
 import kittycards.kittycardsandroid.components.INetworkManager
-import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Player
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
@@ -37,7 +36,7 @@ import kittycards.kittycardsandroid.network.Role
 class JoinActivity : AppCompatActivity() {
 
     @Inject lateinit var networkManager: INetworkManager
-    @Inject lateinit var gameController: GameController
+    @Inject lateinit var gameController: IGameController
 
     private val availableRooms = mutableListOf<NetworkDevice>()
 
@@ -357,7 +356,6 @@ class JoinActivity : AppCompatActivity() {
 
         // gameController is injected
 
-        gameController.setNetworkManager(networkManager)
         gameController.setNetworkRole(Role.GUEST)
         gameController.setLocalPlayer(guestPlayer)
 

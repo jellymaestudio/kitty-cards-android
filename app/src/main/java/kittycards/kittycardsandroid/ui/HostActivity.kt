@@ -24,7 +24,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kittycards.kittycardsandroid.components.IGameController
 import kittycards.kittycardsandroid.components.INetworkManager
-import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.model.Player
 import kittycards.kittycardsandroid.network.GameAction
 import kittycards.kittycardsandroid.network.NetworkDevice
@@ -36,7 +35,7 @@ import kittycards.kittycardsandroid.ui.util.GameColorMapper
 class HostActivity : AppCompatActivity() {
 
     @Inject lateinit var networkManager: INetworkManager
-    @Inject lateinit var gameController: GameController
+    @Inject lateinit var gameController: IGameController
 
     private val availableGuests = mutableListOf<NetworkDevice>()
     private var selectedGuest: NetworkDevice? = null
@@ -243,7 +242,6 @@ class HostActivity : AppCompatActivity() {
 
         // gameController is injected
 
-        gameController.setNetworkManager(networkManager)
         gameController.setNetworkRole(Role.HOST)
         gameController.setLocalPlayer(hostPlayer)
 
@@ -551,7 +549,7 @@ class HostActivity : AppCompatActivity() {
         stopLobbyActionListener()
 
         try {
-            networkManager.closeHostedRoom()
+            networkManager.closeRoom()
         } catch (_: SecurityException) {
             // The Activity can still close if permission was revoked.
         }

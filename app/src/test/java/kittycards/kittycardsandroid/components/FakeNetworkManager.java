@@ -22,7 +22,7 @@ public class FakeNetworkManager implements INetworkManager {
 
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
     private final List<GameAction> sentActions = new ArrayList<>();
-    
+
     private Role role = Role.NOT_CONNECTED;
     private NetworkEventListener eventListener;
     private OnRoomConnectionListener roomConnectionListener;
@@ -127,24 +127,12 @@ public class FakeNetworkManager implements INetworkManager {
     }
 
     @Override
-    public void closeHostedRoom() {
+    public void closeRoom() {
         this.role = Role.NOT_CONNECTED;
     }
 
     @Override
     public void stopRoomDiscovery() {
-        // stop scanning simulation
-    }
 
-    @Override
-    public Role getRole() {
-        return role;
-    }
-
-    public void shutdown() {
-        actionQueue.clear();
-        sentActions.clear();
-        connectedGuests.clear();
-        discoveredDevices.clear();
     }
 }

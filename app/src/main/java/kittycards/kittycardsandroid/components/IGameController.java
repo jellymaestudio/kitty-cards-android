@@ -1,17 +1,19 @@
 package kittycards.kittycardsandroid.components;
 
 import kittycards.kittycardsandroid.model.Card;
+import kittycards.kittycardsandroid.model.Match;
 import kittycards.kittycardsandroid.model.Player;
+import kittycards.kittycardsandroid.network.Role;
 
 /**
- * Controls the local player's in-game actions during an active match.
- * <p>
- * Each method represents a player interaction triggered from the UI.
- * Implementations are responsible for validating the action against the current
- * {@link kittycards.kittycardsandroid.model.GameState}, applying it locally,
- * encoding it as a {@link kittycards.kittycardsandroid.network.GameAction},
- * and forwarding it to the remote device via the
- * {@link kittycards.kittycardsandroid.components.INetworkManager}, if it didn't already come from the remote device.
+ * Defines the public operations of the game controller.
+ *
+ * <p>The controller manages the active match state, validates and applies
+ * player actions, processes remote actions and notifies observing
+ * components about state changes.</p>
+ *
+ * <p>Implementations may use an {@link INetworkManager} to synchronize
+ * game actions with a remote device.</p>
  *
  * @author red_concrete
  * @author JellyMae
@@ -25,6 +27,42 @@ public interface IGameController {
      * @param playerTwo the second player
      */
     void startMatch(Player playerOne, Player playerTwo);
+
+    /**
+     * Returns the currently active match.
+     *
+     * @return the active match, or {@code null} if no match exists
+     */
+    Match getMatch();
+
+    /**
+     * Returns the player controlled by the local device.
+     *
+     * @return the local player, or {@code null} if none is configured
+     */
+    Player getLocalPlayer();
+
+    /**
+     * Returns the remote player of the current match.
+     *
+     * @return the remote player
+     */
+    Player getRemotePlayer();
+
+    /**
+     * Sets the player controlled by the local device.
+     *
+     * @param localPlayer the local player
+     */
+    void setLocalPlayer(Player localPlayer);
+
+    /**
+     * Sets the network role used for the current match.
+     *
+     * @param role the current network role
+     */
+    void setNetworkRole(Role role);
+
 
     /**
      * Marks a card in hand of player as selected.
@@ -64,29 +102,51 @@ public interface IGameController {
      */
     void drawCard(Player player);
 
+
     /**
      * Registers a listener that is notified whenever the {@link kittycards.kittycardsandroid.model.GameState}
      * or the match status changes.
      * <p>
-     * Since {@link IGameController} is a singleton, the UI cannot directly observe state mutations.
-     * Instead, the UI component (e.g. the game Activity or Fragment) registers a callback here
-     * to be notified and trigger a re-render accordingly.
-     * <p>
-     * The listener is invoked after every state-mutating operation, including actions initiated
-     * locally (e.g. {@link #drawCard(Player player)}, {@link #playCard(Player, int, int)}) as well as actions received
-     * from the remote device via {@link INetworkManager#fetchNextAction()}.
-     * <p>
-     * Only one listener can be registered at a time. A subsequent call replaces the previous listener.
-     * Pass {@code null} to unregister.
-     * <p>
-     * Example usage:
-     * <pre>{@code
-     * gameController.setOnStateChangedListener(() -> runOnUiThread(this::updateUI));
-     * }</pre>
+     * Since the game state is managed by the controller, UI components cannot
+     * directly observe state mutations.
+     * Instead, the UI component (e.g. the game Activity or Fragment) registers
+     * a callback here to be notified and trigger a re-render accordingly.
      *
      * @param listener the {@link Runnable} to invoke on every state change, or {@code null} to unregister.
      */
     void setOnStateChangedListener(Runnable listener);
 
+    /**
+     * Registers a listener that is called when the remote player aborts
+     * the active match.
+     *
+     * @param listener callback to execute, or {@code null} to unregister
+     */
+    void setOnMatchAbortedListener(Runnable listener);
 
+    /**
+     * Starts listening for incoming game actions.
+     *
+     * Only one action listener may be active at a time.
+     */
+    void startListeningForActions();
+
+    /**
+     * Stops the listener for incoming game actions.
+     */
+    void stopListeningForActions();
+
+    /**
+     * Returns whether the controller is currently listening for actions.
+     *
+     * @return {@code true} if the action listener is active
+     */
+    boolean isListeningForActions();
+
+    /**
+     * Clears all state belonging to the current match session.
+     *
+     * The injected dependencies of the controller remain available.
+     */
+    void resetSession();
 }

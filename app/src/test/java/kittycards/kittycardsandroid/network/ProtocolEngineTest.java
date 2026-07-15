@@ -53,7 +53,7 @@ class ProtocolEngineTest {
         assertEquals(original.boardPositionColumn(), decoded.boardPositionColumn(), "Column mismatch for " + type);
         assertEquals(original.boardPositionRow(), decoded.boardPositionRow(), "Row mismatch for " + type);
         assertEquals(original.contextSensitiveInt(), decoded.contextSensitiveInt(), "ContextInt mismatch for " + type);
-        
+
         if (original.card() != null) {
             assertNotNull(decoded.card(), "Card should not be null for " + type);
             assertEquals(original.card().getValue(), decoded.card().getValue());
