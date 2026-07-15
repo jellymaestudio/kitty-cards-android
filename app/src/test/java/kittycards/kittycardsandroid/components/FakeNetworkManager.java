@@ -12,7 +12,6 @@ import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
 import kittycards.kittycardsandroid.network.OnGameConnectionListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
 import kittycards.kittycardsandroid.network.OnRoomConnectionListener;
-import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /*only for testing*/
@@ -100,10 +99,5 @@ public class FakeNetworkManager implements INetworkManager {
     @Override
     public void stopRoomDiscovery() {
 
-    }
-
-    @Override
-    public Role getRole() {
-        return null;
     }
 }

@@ -10,7 +10,6 @@ import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
 import kittycards.kittycardsandroid.network.OnGameConnectionListener;
 import kittycards.kittycardsandroid.network.OnGuestConnectedListener;
 import kittycards.kittycardsandroid.network.OnRoomConnectionListener;
-import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
 /**
@@ -45,18 +44,17 @@ public interface INetworkManager {
     void joinMatch(OnDeviceFoundListener listener);
 
     /**
-     * Should be called when the guest wishes to confirm and connect to the selected player.
-     * Establishes a connection between this device and the Hostmatch mobile phone.
+     * Connects to the selected hosted room.
      *
-     * @param room the host device the player wants to join to
+     * @param room the room to connect to
      */
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN})
     void confirmRoom(NetworkDevice room);
 
     /**
-     * To be called when the host wishes to select a guest (that has asked to join the Room) he wants to play with.
+     * Accepts the selected guest for the hosted room.
      *
-     * @param guest The guest device the host wishes to accept.
+     * @param guest the guest to accept
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     void selectGuest(NetworkDevice guest);
@@ -65,7 +63,7 @@ public interface INetworkManager {
      * Closes the active Network connection to the remote device.
      * Should be called when the match ends or a player disconnects.
      */
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE})
     void disconnect();
 
     @RequiresPermission(allOf = {
@@ -103,12 +101,5 @@ public interface INetworkManager {
     void setRoomConnectionListener(OnRoomConnectionListener listener);
 
     void setGameConnectionListener(OnGameConnectionListener listener);
-
-    /**
-     * Returns the current role of this device in the network connection (Host, Guest, or Not Connected).
-     *
-     * @return the role of this device in the network connection
-     */
-    Role getRole();
 
 }

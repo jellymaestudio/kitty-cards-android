@@ -310,7 +310,7 @@ public class BleHost {
          * @param device Target guest device.
          * @param status BLE transmission result status.
          */
-        @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT})
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         @Override
         public void onNotificationSent(BluetoothDevice device, int status) {
             if (status != BluetoothGatt.GATT_SUCCESS) {

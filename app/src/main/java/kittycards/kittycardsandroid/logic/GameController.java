@@ -233,12 +233,6 @@ public class GameController implements IGameController {
             return;
         }
 
-        if (networkManager == null) {
-            throw new IllegalStateException(
-                    "NetworkManager must be set before starting the action listener"
-            );
-        }
-
         if (role == Role.NOT_CONNECTED) {
             throw new IllegalStateException(
                     "Network role must be set before starting the action listener"
@@ -557,9 +551,7 @@ public class GameController implements IGameController {
 
     @SuppressLint("MissingPermission")
     private void sendGameAction(GameAction action) {
-        if (networkManager != null) {
-            networkManager.sendGameChange(action);
-        }
+        networkManager.sendGameChange(action);
     }
 
     private void sendBoardSetup() {
