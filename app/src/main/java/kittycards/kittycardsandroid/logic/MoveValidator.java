@@ -59,7 +59,7 @@ public class MoveValidator {
      * @return true if the player can play a card on the given field, false otherwise
      * @throws NullPointerException if the player is null
      */
-        public boolean canPlayCard(Player player, int row, int column) {
+     public boolean canPlayCard(Player player, int row, int column) {
         if (match.getMatchStatus() != MatchStatus.RUNNING) {
             return false;
         }

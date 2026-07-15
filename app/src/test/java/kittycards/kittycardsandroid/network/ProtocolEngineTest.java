@@ -36,9 +36,14 @@ class ProtocolEngineTest {
     }
 
     @Test
-    void encode_producesArrayOfLength6() {
-        GameAction action = new GameAction(GameAction.ActionType.UNSELECT_CARD);
-        assertEquals(6, engine.encodeGameAction(action).length);
+    void encode_producesArrayOfLength7() {
+        GameAction action =
+                new GameAction(GameAction.ActionType.UNSELECT_CARD);
+
+        assertEquals(
+                7,
+                engine.encodeGameAction(action).length
+        );
     }
 
     @Test
@@ -52,21 +57,32 @@ class ProtocolEngineTest {
         assertEquals(-1, bytes[3]); // keine Boardfarbe
         assertEquals(-1, bytes[4]); // keine Spalte
         assertEquals(-1, bytes[5]); // keine Zeile
+        assertEquals(-1, bytes[6]);
     }
 
     @Test
     void encode_drawCard_cardBytesAreSet() {
         GameColor cardColor = firstCardColor();
-        Card card = new Card(cardColor, 7);
-        GameAction action = new GameAction(GameAction.ActionType.DRAW_CARD, card);
+        Card card = new Card(cardColor, 6);
+
+        GameAction action =
+                new GameAction(
+                        GameAction.ActionType.DRAW_CARD,
+                        card
+                );
+
         byte[] bytes = engine.encodeGameAction(action);
 
-        assertEquals((byte) GameAction.ActionType.DRAW_CARD.ordinal(), bytes[0]);
-        assertEquals(7, bytes[1]);
+        assertEquals(
+                (byte) GameAction.ActionType.DRAW_CARD.ordinal(),
+                bytes[0]
+        );
+        assertEquals(6, bytes[1]);
         assertEquals((byte) cardColor.ordinal(), bytes[2]);
-        assertEquals(-1, bytes[3]); // keine Boardfarbe
+        assertEquals(-1, bytes[3]);
         assertEquals(-1, bytes[4]);
         assertEquals(-1, bytes[5]);
+        assertEquals(-1, bytes[6]);
     }
 
     @Test
@@ -141,22 +157,29 @@ class ProtocolEngineTest {
     @Test
     void decode_invalidActionTypeOrdinal_throwsIAE() {
         // bytes[0] = 99: weit außerhalb jedes realistischen ActionType-Bereichs
-        byte[] bytes = {99, -1, -1, -1, -1, -1};
+        byte[] bytes = {99, -1, -1, -1, -1, -1, -1};
         assertThrows(IllegalArgumentException.class, () -> engine.decodeGameAction(bytes));
     }
 
     @Test
     void decode_allNegativeOnes_throwsIAE() {
         // Alle -1: ActionType-Ordinal -1 ist ungültig
-        byte[] bytes = {-1, -1, -1, -1, -1, -1};
+        byte[] bytes = {-1, -1, -1, -1, -1, -1, -1};
         assertThrows(IllegalArgumentException.class, () -> engine.decodeGameAction(bytes));
     }
 
     @Test
     void decode_allMaxValue_throwsIAE() {
         // Byte.MAX_VALUE (127) für alles: Ordinals weit außerhalb gültiger Bereiche
-        byte[] bytes = {Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE,
-                Byte.MAX_VALUE, Byte.MAX_VALUE, Byte.MAX_VALUE};
+        byte[] bytes = {
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE,
+                Byte.MAX_VALUE
+        };
         assertThrows(IllegalArgumentException.class, () -> engine.decodeGameAction(bytes));
     }
 
@@ -165,8 +188,11 @@ class ProtocolEngineTest {
         byte[] bytes = {
                 (byte) GameAction.ActionType.DRAW_CARD.ordinal(),
                 5,
-                99,  // out of range für GameColor
-                -1, -1, -1
+                99,
+                -1,
+                -1,
+                -1,
+                -1
         };
         assertThrows(IllegalArgumentException.class, () -> engine.decodeGameAction(bytes));
     }
@@ -175,8 +201,9 @@ class ProtocolEngineTest {
     void decode_unselectCard_returnsCorrectAction() {
         byte[] bytes = {
                 (byte) GameAction.ActionType.UNSELECT_CARD.ordinal(),
-                -1, -1, -1, -1, -1
+                -1, -1, -1, -1, -1, -1
         };
+
         GameAction action = engine.decodeGameAction(bytes);
 
         assertEquals(GameAction.ActionType.UNSELECT_CARD, action.type());
@@ -191,15 +218,18 @@ class ProtocolEngineTest {
         GameColor cardColor = firstCardColor();
         byte[] bytes = {
                 (byte) GameAction.ActionType.DRAW_CARD.ordinal(),
-                7,
+                6,
                 (byte) cardColor.ordinal(),
-                -1, -1, -1
+                -1,
+                -1,
+                -1,
+                -1
         };
         GameAction action = engine.decodeGameAction(bytes);
 
         assertEquals(GameAction.ActionType.DRAW_CARD, action.type());
         assertNotNull(action.card());
-        assertEquals(7, action.card().getValue());
+        assertEquals(6, action.card().getValue());
         assertEquals(cardColor, action.card().getColor());
         assertNull(action.boardColor());
     }
@@ -213,7 +243,8 @@ class ProtocolEngineTest {
                 (byte) cardColor.ordinal(),
                 -1,
                 0,
-                2
+                2,
+                -1
         };
         GameAction action = engine.decodeGameAction(bytes);
 
@@ -234,7 +265,8 @@ class ProtocolEngineTest {
                 -1,
                 (byte) boardColor.ordinal(),
                 1,
-                2
+                2,
+                -1
         };
         GameAction action = engine.decodeGameAction(bytes);
 

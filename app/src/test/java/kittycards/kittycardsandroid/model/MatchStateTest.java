@@ -529,7 +529,7 @@ class MatchStateTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void reevaluationWithoutEndConditionReturnsFalseButKeepsFinishedState() {
+    void reevaluationOfFinishedMatchReturnsTrueAndKeepsFinishedState() {
         playerOne.addWin();
         playerOne.addWin();
 
@@ -548,7 +548,7 @@ class MatchStateTest {
                 replacementPlayerTwo
         );
 
-        assertFalse(result);
+        assertTrue(result);
         assertTrue(matchState.isFinished());
         assertSame(playerOne, matchState.getMatchWinner());
     }
