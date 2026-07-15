@@ -6,14 +6,15 @@ import android.os.Looper
 import kittycards.kittycardsandroid.components.IGameController
 import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.network.GameAction
-
+import kittycards.kittycardsandroid.network.OnGameConnectionListener
 import javax.inject.Inject
 
 /**
  * Coordinates the lifecycle of an active network game session.
  *
- * This controller is responsible for stopping game communication,
- * disconnecting the network session and resetting the game controller.
+ * This controller is responsible for observing connection loss,
+ * stopping game communication, disconnecting the network session
+ * and resetting the game controller.
  *
  * It does not access Android views and does not perform navigation.
  *
@@ -38,9 +39,32 @@ class GameSessionController @Inject constructor(
      */
     var onSessionClosed: (() -> Unit)? = null
 
-    private val handler = Handler(Looper.getMainLooper())
+    private val handler =
+        Handler(Looper.getMainLooper())
 
     private var sessionEnding = false
+
+    /**
+     * Registers the listener for unexpected connection loss during a game.
+     *
+     * @param remoteDisconnectDelayMillis delay before the session is cleaned up
+     * after the remote player disconnects
+     */
+    fun initialize(
+        remoteDisconnectDelayMillis: Long = 2_000L
+    ) {
+        networkManager.setGameConnectionListener(
+            object : OnGameConnectionListener {
+
+                override fun onGamePartnerDisconnected() {
+                    handleRemoteDisconnect(
+                        delayMillis =
+                            remoteDisconnectDelayMillis
+                    )
+                }
+            }
+        )
+    }
 
     /**
      * Returns whether the current session is already being closed.
@@ -112,7 +136,7 @@ class GameSessionController @Inject constructor(
      * Aborts the current match because the local player leaves the game.
      *
      * MATCH_ABORTED is sent first. The local session is cleaned up shortly
-     * afterwards so the BLE queue has time to transmit the action.
+     * afterwards so the network queue has time to transmit the action.
      */
     @SuppressLint("MissingPermission")
     fun abortLocalSession(
@@ -174,12 +198,15 @@ class GameSessionController @Inject constructor(
     }
 
     /**
-     * Removes pending callbacks and references held by this controller.
+     * Removes pending callbacks, listeners and references held by this
+     * controller.
      *
      * Call this when the owning Activity is destroyed.
      */
     fun cleanup() {
         handler.removeCallbacksAndMessages(null)
+
+        networkManager.setGameConnectionListener(null)
 
         onOpponentDisconnected = null
         onSessionClosed = null
