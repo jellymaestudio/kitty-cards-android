@@ -3,8 +3,9 @@ package kittycards.kittycardsandroid.logic
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
+import kittycards.kittycardsandroid.components.IGameController
+import kittycards.kittycardsandroid.components.INetworkManager
 import kittycards.kittycardsandroid.network.GameAction
-import kittycards.kittycardsandroid.network.NetworkManager
 
 import javax.inject.Inject
 
@@ -19,8 +20,8 @@ import javax.inject.Inject
  * @author JellyMae
  */
 class GameSessionController @Inject constructor(
-    private val gameController: GameController,
-    private val networkManager: NetworkManager
+    private val gameController: IGameController,
+    private val networkManager: INetworkManager
 ) {
 
     /**

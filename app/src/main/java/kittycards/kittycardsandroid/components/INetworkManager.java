@@ -23,33 +23,23 @@ import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 public interface INetworkManager {
 
     //TODO dafür sorgen, dass empfangene Actions erst über fetchAction auslesbar sind, wenn wir eine Antwort vom senden haben.
-    //TODO wenn der Client mehrmals bestätigt/subscribed, bekommt er nachrichten vom host mehrmals
+    //TODO wenn der Client mehrmals bestätigt/subscribed, bekommt er Nachrichten vom host mehrmals
     //TODO Empfangsbestätigung für nachrichten ausgeben
     //TODO Host Guest setup, Host disconnected, guest sendet, fehler ist write failed mit status 1, soll das so?
     //TODO Host guest setup, Host hat aber guest noch NICHT ausgewählt.
     //  Host disconnected und startet neu -> gast muss nicht neu suchen/bestätigen -> kann direkt annehmen
     /**
-     * To be called when the host wishes to open a Room for a new match.
-     * Starts BLE advertising to make this device discoverable to potential guests.
-     * <p>
-     * Requires {@link android.Manifest.permission#BLUETOOTH_ADVERTISE} to be granted
-     * before calling this method.
+     * Opens a discoverable room for a new match.
      *
-     * @param listener The callback to be invoked when a guest successfully connects to this host.
+     * @param listener callback invoked when available guests change
      */
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_CONNECT})
     void hostMatch(OnGuestConnectedListener listener);
 
     /**
-     * To be called when the guest wishes to join a match.
-     * Scans for hosted matches advertised by other devices.
-     * <p>
-     * Requires {@link android.Manifest.permission#BLUETOOTH_SCAN} to be granted
-     * before calling this method.
+     * Starts discovering available hosted rooms.
      *
-     * @param listener The callback to be invoked when network devices offering a game are discovered.
-     *                 The listener will be called multiple times as devices are found, for up to 10 seconds
-     *                 after this method is called.
+     * @param listener callback receiving the currently available rooms
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     void joinMatch(OnDeviceFoundListener listener);
@@ -82,7 +72,7 @@ public interface INetworkManager {
             Manifest.permission.BLUETOOTH_ADVERTISE,
             Manifest.permission.BLUETOOTH_CONNECT
     })
-    void closeHostedRoom();
+    void closeRoom();
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     void stopRoomDiscovery();
@@ -96,7 +86,7 @@ public interface INetworkManager {
      * <p>
      * Intended for game loop consumption.
      *
-     * @return next GameAction received via BLE
+     * @return next GameAction received from the remote device
      * @throws InterruptedException if thread is interrupted while waiting
      */
 

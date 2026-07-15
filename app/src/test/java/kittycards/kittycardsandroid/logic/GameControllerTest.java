@@ -237,7 +237,7 @@ class GameControllerTest {
 
     @Test
     void setNetworkManagerAllowsActionListenerConfiguration() {
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         assertDoesNotThrow(
@@ -252,23 +252,26 @@ class GameControllerTest {
         INetworkManager secondNetworkManager =
                 Mockito.mock(INetworkManager.class);
 
-        controller.setNetworkManager(networkManager);
+        
 
         assertDoesNotThrow(
-                () -> controller.setNetworkManager(
+                () -> new GameController(
                         secondNetworkManager
                 )
         );
     }
 
+    //TODO
+    /*
     @Test
     void setNetworkManagerAcceptsNull() {
-        controller.setNetworkManager(networkManager);
+        
 
         assertDoesNotThrow(
                 () -> controller.setNetworkManager(null)
         );
     }
+    */
 
     @Test
     void setNetworkRoleAcceptsEveryRole() {
@@ -304,7 +307,7 @@ class GameControllerTest {
                 () -> controller.setNetworkRole(null)
         );
 
-        controller.setNetworkManager(networkManager);
+        
 
         assertDoesNotThrow(controller::startListeningForActions);
 
@@ -335,7 +338,7 @@ class GameControllerTest {
 
     @Test
     void resetSessionStopsActionListener() {
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
         controller.startListeningForActions();
 
@@ -348,7 +351,7 @@ class GameControllerTest {
     /*
     @Test
     void resetSessionClearsNetworkManager() {
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         controller.resetSession();
@@ -362,12 +365,12 @@ class GameControllerTest {
 
     @Test
     void resetSessionRestoresNotConnectedRole() {
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         controller.resetSession();
 
-        controller.setNetworkManager(networkManager);
+        
 
         assertThrows(
                 IllegalStateException.class,
@@ -702,7 +705,7 @@ class GameControllerTest {
     @Test
     void guestStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -716,7 +719,7 @@ class GameControllerTest {
     @Test
     void guestStartMatchDoesNotSendGameActions() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -729,7 +732,7 @@ class GameControllerTest {
     @Test
     void guestStartMatchDoesNotDealInitialCardsLocally() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -740,7 +743,7 @@ class GameControllerTest {
     @Test
     void guestStartMatchWaitsForRemoteBoardSetup() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -766,7 +769,7 @@ class GameControllerTest {
     @Test
     void notConnectedStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.NOT_CONNECTED);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -780,7 +783,7 @@ class GameControllerTest {
     @Test
     void notConnectedStartMatchDoesNotSendGameActions() {
         controller.setNetworkRole(Role.NOT_CONNECTED);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -835,7 +838,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchCreatesRunningMatch() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -849,7 +852,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchDealsTwoCardsToStartingPlayer() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -867,7 +870,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchDealsThreeCardsToSecondPlayer() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -885,7 +888,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchDealsFiveCardsInTotal() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -899,7 +902,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchDealsOnlyValidCards() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -920,7 +923,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsExactlyFourteenGameActions() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -933,7 +936,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsStartingPlayerActionOnce() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -952,7 +955,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsEightBoardColorActions() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -971,7 +974,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsFiveDealCardActions() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -990,7 +993,7 @@ class GameControllerTest {
     @Test
     void hostStartMatchSendsActionsInExpectedGeneralOrder() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1019,7 +1022,7 @@ class GameControllerTest {
     @Test
     void sentStartingPlayerMatchesLocalStartingPlayer() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1050,7 +1053,7 @@ class GameControllerTest {
     @Test
     void sentBoardColorsMatchLocalBoard() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1090,7 +1093,7 @@ class GameControllerTest {
     @Test
     void hostDoesNotSendCenterFieldAsBoardColor() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1116,7 +1119,7 @@ class GameControllerTest {
     @Test
     void everySentBoardColorActionHasValidPosition() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1141,7 +1144,7 @@ class GameControllerTest {
     @Test
     void sentDealCardsMatchLocallyStoredCards() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1174,7 +1177,7 @@ class GameControllerTest {
     @Test
     void dealCardActionsTargetCorrectPlayers() {
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
 
         controller.startMatch(playerOne, playerTwo);
 
@@ -1220,7 +1223,7 @@ class GameControllerTest {
                 new AtomicInteger();
 
         controller.setNetworkRole(Role.HOST);
-        controller.setNetworkManager(networkManager);
+        
         controller.setOnStateChangedListener(
                 notificationCount::incrementAndGet
         );
@@ -1870,7 +1873,7 @@ class GameControllerTest {
 
     @Test
     void successfulSelectCardSendsSelectCardAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 3);
@@ -1896,7 +1899,7 @@ class GameControllerTest {
 
     @Test
     void successfulSelectCardSendsExactlyOneAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 3);
@@ -1912,7 +1915,7 @@ class GameControllerTest {
 
     @Test
     void rejectedSelectCardDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card unownedCard =
@@ -1928,7 +1931,7 @@ class GameControllerTest {
 
     @Test
     void selectCardWithNullPlayerDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 3);
@@ -1943,7 +1946,7 @@ class GameControllerTest {
 
     @Test
     void selectCardWithNullCardDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         assertThrows(
@@ -2080,7 +2083,7 @@ class GameControllerTest {
 
     @Test
     void unselectCardSendsUnselectCardAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 3);
@@ -2107,7 +2110,7 @@ class GameControllerTest {
 
     @Test
     void unselectCardSendsActionEvenWithoutExistingSelection() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         controller.unselectCard(playerOne);
@@ -2137,7 +2140,7 @@ class GameControllerTest {
 
     @Test
     void unselectCardWithNullPlayerThrowsNullPointerException() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         assertThrows(
@@ -2148,7 +2151,7 @@ class GameControllerTest {
 
     @Test
     void unselectCardWithNullPlayerDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         assertThrows(
@@ -2181,7 +2184,7 @@ class GameControllerTest {
 
     @Test
     void rejectedUnselectCardForForeignPlayerDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player foreignPlayer =
@@ -2201,7 +2204,7 @@ class GameControllerTest {
 
     @Test
     void rejectedUnselectCardWhenMatchIsPausedDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 3);
@@ -2543,7 +2546,7 @@ class GameControllerTest {
 
     @Test
     void successfulPlayCardSendsPlayCardAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -2587,7 +2590,7 @@ class GameControllerTest {
 
     @Test
     void successfulPlayCardSendsExactlyOneAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -2840,7 +2843,7 @@ class GameControllerTest {
 
     @Test
     void rejectedPlayCardDoesNotSendNetworkAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3195,7 +3198,7 @@ class GameControllerTest {
 
     @Test
     void successfulDrawCardSendsDrawCardAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3223,7 +3226,7 @@ class GameControllerTest {
 
     @Test
     void successfulDrawCardSendsExactlyOneAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3238,7 +3241,7 @@ class GameControllerTest {
 
     @Test
     void sentDrawnCardMatchesLocallyAddedCard() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3274,7 +3277,7 @@ class GameControllerTest {
 
     @Test
     void rejectedDrawCardDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3291,7 +3294,7 @@ class GameControllerTest {
 
     @Test
     void drawCardAtHandLimitDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Player currentPlayer = getCurrentPlayer();
@@ -3307,7 +3310,7 @@ class GameControllerTest {
 
     @Test
     void drawCardWithNullPlayerDoesNotSendAction() {
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         assertThrows(
@@ -5069,7 +5072,7 @@ class GameControllerTest {
 
     @Test
     void startListeningForActionsRejectsNotConnectedRole() {
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.NOT_CONNECTED);
 
         assertThrows(
@@ -5089,7 +5092,7 @@ class GameControllerTest {
                     return null;
                 });
 
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
@@ -5113,7 +5116,7 @@ class GameControllerTest {
                     return null;
                 });
 
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
@@ -5148,7 +5151,7 @@ class GameControllerTest {
                     return null;
                 });
 
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.HOST);
 
         controller.startListeningForActions();
@@ -5194,7 +5197,7 @@ class GameControllerTest {
                     return null;
                 });
 
-        controller.setNetworkManager(networkManager);
+        
         controller.setNetworkRole(Role.GUEST);
 
         controller.startListeningForActions();
@@ -5218,7 +5221,7 @@ class GameControllerTest {
     void actionListenerProcessesFetchedMatchFinishedAction()
             throws Exception {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         CountDownLatch actionHandled = new CountDownLatch(1);
@@ -5254,7 +5257,7 @@ class GameControllerTest {
     void actionListenerProcessesFetchedDealCardAction()
             throws Exception {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
 
         Card card = new Card(GameColor.YELLOW, 4);
@@ -5301,7 +5304,7 @@ class GameControllerTest {
                                 return null;
                             });
 
-                    controller.setNetworkManager(networkManager);
+                    
                     controller.setNetworkRole(Role.HOST);
 
                     controller.startListeningForActions();
@@ -5462,7 +5465,7 @@ class GameControllerTest {
 
     private void prepareGuestMatchWithNetworkManager() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 
@@ -5542,7 +5545,7 @@ class GameControllerTest {
 
     private void prepareHostMatchWithNetworkManagerWithoutInitialCards() {
         controller.setNetworkRole(Role.GUEST);
-        controller.setNetworkManager(networkManager);
+        
         controller.startMatch(playerOne, playerTwo);
         controller.setLocalPlayer(playerOne);
 

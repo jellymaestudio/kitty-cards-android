@@ -93,7 +93,7 @@ public class FakeNetworkManager implements INetworkManager {
     }
 
     @Override
-    public void closeHostedRoom() {
+    public void closeRoom() {
 
     }
 

@@ -27,14 +27,12 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kittycards.kittycardsandroid.components.IGameController
 import kittycards.kittycardsandroid.components.INetworkManager
-import kittycards.kittycardsandroid.logic.GameController
 import kittycards.kittycardsandroid.logic.GameSessionController
 import kittycards.kittycardsandroid.model.Card
 import kittycards.kittycardsandroid.model.Field
 import kittycards.kittycardsandroid.model.GameColor
 import kittycards.kittycardsandroid.model.MatchStatus
 import kittycards.kittycardsandroid.model.RoundResult
-import kittycards.kittycardsandroid.network.NetworkManager
 import kittycards.kittycardsandroid.ui.util.GameColorMapper
 import kittycards.kittycardsandroid.network.OnGameConnectionListener
 
@@ -82,9 +80,10 @@ class GameActivity : AppCompatActivity() {
                 }
             }
         }
-    @Inject lateinit var gameController: GameController
+
+    @Inject lateinit var gameController: IGameController
+    @Inject lateinit var networkManager: INetworkManager
     @Inject lateinit var gameSessionController: GameSessionController
-    @Inject lateinit var networkManager: NetworkManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

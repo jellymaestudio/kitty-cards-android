@@ -3,19 +3,18 @@ package kittycards.kittycardsandroid.components;
 import kittycards.kittycardsandroid.network.GameAction;
 
 /**
- * Handles encoding and decoding of {@link GameAction} objects for network transmission.
- * <p>
- * Converts a {@link GameAction} into a compact 6-byte array and back,
- * allowing game actions to be sent between devices over the network.
- * <p>
- * Byte layout:
+ * Handles encoding and decoding of {@link GameAction} objects
+ * for network transmission.
+ *
+ * <p>Byte layout:</p>
  * <pre>
  * [0] ActionType ordinal
- * [1] Card value           (-1 if no card)
- * [2] CardColor ordinal    (-1 if no card)
- * [3] Board color ordinal  (-1 if not applicable)
- * [4] Board column         (-1 if not applicable)
- * [5] Board row            (-1 if not applicable)
+ * [1] Card value                  (-1 if no card)
+ * [2] CardColor ordinal           (-1 if no card)
+ * [3] Board color ordinal         (-1 if not applicable)
+ * [4] Board column
+ * [5] Board row
+ * [6] Context-sensitive integer
  * </pre>
  *
  * @author red_concrete
@@ -25,7 +24,7 @@ public interface IProtocolEngine {
      * Encodes a {@link GameAction} into a 6-byte array for network transmission.
      *
      * @param action the action to encode; must not be {@code null}
-     * @return a 6-byte array representing the action
+     * @return a 7-byte array representing the action
      * @throws NullPointerException if {@code action} is {@code null}
      */
     byte[] encodeGameAction(GameAction action);
