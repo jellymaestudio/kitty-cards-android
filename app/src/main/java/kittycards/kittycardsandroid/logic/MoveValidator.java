@@ -147,7 +147,8 @@ public class MoveValidator {
             return false;
         }
 
-        return player == match.getPlayerOne()
-                || player == match.getPlayerTwo();
+        return (player == match.getPlayerOne()
+                || player == match.getPlayerTwo())
+                && player.hasSelectedCard();
     }
 }
