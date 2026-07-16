@@ -14,6 +14,7 @@ androidJunit  = "2.0.1"
 composeBom = "2025.05.01"
 kotlin = "2.2.10"
 mockitoCore = "5.23.0"
+mockitoAndroid = "5.23.0"
 mockitoJunitJupiter = "5.23.0"
 robolectric = "4.16.1"
 hilt = "2.60.1"
@@ -41,11 +42,12 @@ junit-vintage-engine  = { group = "org.junit.vintage", name = "junit-vintage-eng
 
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
-androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }  # Version via BOM
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }  # Version via BOM
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore" }
+mockitoandroid = { module = "org.mockito:mockito-android", version.ref = "mockitoAndroid" }
 mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockitoJunitJupiter" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 

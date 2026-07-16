@@ -14,6 +14,9 @@ import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEvent;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
+/**
+ * A robust fake implementation of INetworkManager for testing purposes.
+ */
 public class FakeNetworkManager implements INetworkManager {
 
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
@@ -28,6 +31,8 @@ public class FakeNetworkManager implements INetworkManager {
 
     private final ArrayList<NetworkDevice> connectedGuests = new ArrayList<>();
     private final ArrayList<NetworkDevice> discoveredDevices = new ArrayList<>();
+
+    // --- Simulation API ---
 
     public void simulateIncomingAction(GameAction action) {
         actionQueue.add(action);
@@ -59,28 +64,6 @@ public class FakeNetworkManager implements INetworkManager {
         }
     }
 
-    public void simulateConnectionTimeout() {
-        simulateNetworkEvent(NetworkEvent.NetworkMessageType.ERROR, "Connection timeout");
-    }
-
-    public void simulateConnectionRejected() {
-        simulateNetworkEvent(NetworkEvent.NetworkMessageType.ERROR, "Connection rejected by host");
-    }
-
-    public void simulateLostConnection() {
-        role = Role.NOT_CONNECTED;
-        if (roomConnectionListener != null) {
-            roomConnectionListener.onRoomDisconnected();
-        }
-        if (gameConnectionListener != null) {
-            gameConnectionListener.onGamePartnerDisconnected();
-        }
-    }
-
-    public void simulateReconnect(Role newRole) {
-        this.role = newRole;
-    }
-
     public List<GameAction> getSentActions() {
         return new ArrayList<>(sentActions);
     }
@@ -88,6 +71,8 @@ public class FakeNetworkManager implements INetworkManager {
     public void clearSentActions() {
         sentActions.clear();
     }
+
+    // --- INetworkManager Implementation ---
 
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
@@ -110,6 +95,7 @@ public class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void selectGuest(NetworkDevice guest) {
+        // Simulation logic if needed
     }
 
     @Override
@@ -155,8 +141,10 @@ public class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void stopRoomDiscovery() {
+        // No-op for fake
     }
 
+    @Override
     public Role getRole() {
         return role;
     }
