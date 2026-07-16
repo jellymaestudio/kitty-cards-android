@@ -36,7 +36,7 @@ import kittycards.kittycardsandroid.network.Role;
 @HiltAndroidTest
 @RunWith(RobolectricTestRunner.class)
 @Config(application = HiltTestApplication.class)
-public class GameControllerIntegrationTest {
+public class GameControllerFlowTest {
 
     @Rule
     public HiltAndroidRule hiltRule = new HiltAndroidRule(this);
