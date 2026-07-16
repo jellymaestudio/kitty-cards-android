@@ -104,7 +104,7 @@ public class NetworkIntegrationTest {
 
     // --- hostMatch(listener) ---
 
-    @Test
+    @Test(timeout = 5000)
     public void hostMatch_setsRoleToHost_andDelegatesToBleHost() throws Exception {
         useMocks();
         OnGuestConnectedListener listener = mock(OnGuestConnectedListener.class);
@@ -114,7 +114,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost).hostMatch(listener);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void hostMatch_whilePreviouslyGuest_disconnectsGuestFirst() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -124,7 +124,7 @@ public class NetworkIntegrationTest {
         assertEquals(Role.HOST, networkManager.getRole());
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void hostMatch_bleAdvertiserUnavailable_emitsErrorAndDoesNotStartGattServer() throws Exception {
         when(mockBluetoothAdapter.getBluetoothLeAdvertiser()).thenReturn(null);
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -136,7 +136,7 @@ public class NetworkIntegrationTest {
         assertTrue(eventCaptor.getValue().message().contains("Advertising not supported"));
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void hostMatch_calledTwice_secondCallIgnoredByBleHost() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         idle();
@@ -154,7 +154,7 @@ public class NetworkIntegrationTest {
 
     // --- joinMatch(listener) ---
 
-    @Test
+    @Test(timeout = 5000)
     public void joinMatch_setsRoleToGuest_andDelegatesToBleGuest() throws Exception {
         useMocks();
         OnDeviceFoundListener listener = mock(OnDeviceFoundListener.class);
@@ -164,7 +164,7 @@ public class NetworkIntegrationTest {
         verify(mockBleGuest).joinMatch(listener);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void joinMatch_whilePreviouslyHost_disconnectsHostFirst() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -174,7 +174,7 @@ public class NetworkIntegrationTest {
         assertEquals(Role.GUEST, networkManager.getRole());
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void joinMatch_scannerUnavailable_emitsError() throws Exception {
         when(mockBluetoothAdapter.getBluetoothLeScanner()).thenReturn(null);
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -188,7 +188,7 @@ public class NetworkIntegrationTest {
 
     // --- confirmRoom(device) ---
 
-    @Test
+    @Test(timeout = 5000)
     public void confirmRoom_asGuest_stopsScanAndConnectsGatt() throws Exception {
         useMocks();
         NetworkDevice device = new NetworkDevice("Test", "00:11:22:33:44:55");
@@ -196,7 +196,7 @@ public class NetworkIntegrationTest {
         verify(mockBleGuest).confirmRoom(device);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void confirmRoom_invalidMacAddress_emitsErrorWithoutConnecting() throws Exception {
         networkManager.confirmRoom(new NetworkDevice("Broken", "NOT_A_MAC"));
         idle();
@@ -207,7 +207,7 @@ public class NetworkIntegrationTest {
         assertTrue(eventCaptor.getValue().message().contains("Invalid MAC address"));
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void confirmRoom_existingActiveConnection_closesOldConnectionFirst() throws Exception {
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
         BleGuest guest = (BleGuest) getInternalField(networkManager, "bleGuest");
@@ -224,7 +224,7 @@ public class NetworkIntegrationTest {
 
     // --- selectGuest(device) ---
 
-    @Test
+    @Test(timeout = 5000)
     public void selectGuest_asHost_setsSelectedGuestAndSendsGuestAccepted() throws Exception {
         useMocks();
         NetworkDevice device = new NetworkDevice("Guest", "00:11:22:33:44:55");
@@ -232,7 +232,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost).selectGuest(device);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void selectGuest_disconnectsAllOtherConnectedGuests() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
@@ -257,7 +257,7 @@ public class NetworkIntegrationTest {
         verify(mockServer).cancelConnection(mockOtherDevice);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void selectGuest_guestNotInConnectedList_emitsErrorWithoutSelecting() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         networkManager.selectGuest(new NetworkDevice("Unknown", "FF:FF:FF:FF:FF:FF"));
@@ -269,7 +269,7 @@ public class NetworkIntegrationTest {
         assertTrue(eventCaptor.getValue().message().contains("not connected"));
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void selectGuest_nullGuest_emitsError() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         networkManager.selectGuest(null);
@@ -283,7 +283,7 @@ public class NetworkIntegrationTest {
 
     // --- disconnect() ---
 
-    @Test
+    @Test(timeout = 5000)
     public void disconnect_asHost_delegatesToBleHostAndClearsRole() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -293,7 +293,7 @@ public class NetworkIntegrationTest {
         assertEquals(Role.NOT_CONNECTED, networkManager.getRole());
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void disconnect_asGuest_delegatesToBleGuestAndClearsRole() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -303,7 +303,7 @@ public class NetworkIntegrationTest {
         assertEquals(Role.NOT_CONNECTED, networkManager.getRole());
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void disconnect_whileNotConnected_doesNothingSilently() throws Exception {
         useMocks();
         networkManager.disconnect();
@@ -311,7 +311,7 @@ public class NetworkIntegrationTest {
         verify(mockBleGuest, never()).disconnect();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void disconnect_clearsActionQueue() throws Exception {
         networkManager.decodeAndQueueDataSafe(new byte[6]);
         networkManager.disconnect();
@@ -323,7 +323,7 @@ public class NetworkIntegrationTest {
 
     // --- closeHostedRoom() ---
 
-    @Test
+    @Test(timeout = 5000)
     public void closeHostedRoom_asHost_sendsRoomClosedBeforeDisconnect() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -331,7 +331,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost).closeRoom();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void closeHostedRoom_calledAsGuest_isIgnored() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -339,7 +339,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost, never()).closeRoom();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void closeHostedRoom_noSelectedGuest_disconnectsImmediately() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
@@ -353,7 +353,7 @@ public class NetworkIntegrationTest {
 
     // --- stopRoomDiscovery() ---
 
-    @Test
+    @Test(timeout = 5000)
     public void stopRoomDiscovery_asHost_stopsAdvertisingKeepsConnection() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -361,7 +361,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost).stopRoomDiscovery();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void stopRoomDiscovery_calledAsGuest_isIgnored() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -369,7 +369,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost, never()).stopRoomDiscovery();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void stopRoomDiscovery_alreadyStopped_emitsWarning() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
@@ -386,7 +386,7 @@ public class NetworkIntegrationTest {
 
     // --- sendGameChange(action) ---
 
-    @Test
+    @Test(timeout = 5000)
     public void sendGameChange_asHost_delegatesToBleHostQueue() throws Exception {
         useMocks();
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -395,7 +395,7 @@ public class NetworkIntegrationTest {
         verify(mockBleHost).sendGameChange(action);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void sendGameChange_asGuest_delegatesToBleGuestQueue() throws Exception {
         useMocks();
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -404,12 +404,12 @@ public class NetworkIntegrationTest {
         verify(mockBleGuest).sendGameChange(action);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void sendGameChange_notConnected_throwsIllegalStateException() {
         assertThrows(IllegalStateException.class, () -> networkManager.sendGameChange(new GameAction(GameAction.ActionType.UNSELECT_CARD)));
     }
 
-    @Test
+    @Test(timeout = 5000)
     @SuppressWarnings("unchecked")
     public void sendGameChange_queueFullAsGuest_dropsOldestMessage() throws Exception {
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
@@ -435,7 +435,7 @@ public class NetworkIntegrationTest {
 
     // --- fetchNextAction() ---
 
-    @Test
+    @Test(timeout = 5000)
     public void fetchNextAction_returnsDecodedActionAfterHostWriteRequest() throws Exception {
         GameAction action = new GameAction(GameAction.ActionType.UNSELECT_CARD);
         when(mockProtocolEngine.decodeGameAction(any())).thenReturn(action);
@@ -446,7 +446,7 @@ public class NetworkIntegrationTest {
         assertEquals(action, result);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void fetchNextAction_returnsDecodedActionAfterGuestNotification() throws Exception {
         networkManager.joinMatch(mock(OnDeviceFoundListener.class));
         BleGuest guest = (BleGuest) getInternalField(networkManager, "bleGuest");
@@ -463,7 +463,7 @@ public class NetworkIntegrationTest {
         assertEquals(action, result);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void fetchNextAction_blocksUntilActionQueued() throws Exception {
         GameAction action = new GameAction(GameAction.ActionType.UNSELECT_CARD);
         CountDownLatch latch = new CountDownLatch(1);
@@ -484,7 +484,7 @@ public class NetworkIntegrationTest {
         assertTrue("Background thread should have finished", latch.await(2, TimeUnit.SECONDS));
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void fetchNextAction_interruptedWhileWaiting_propagatesInterruption() {
         AtomicBoolean interrupted = new AtomicBoolean(false);
         Thread t = new Thread(() -> {
@@ -506,7 +506,7 @@ public class NetworkIntegrationTest {
 
     // --- Listeners ---
 
-    @Test
+    @Test(timeout = 5000)
     public void setRoomConnectionListener_forwardedToBleGuest() throws Exception {
         useMocks();
         OnRoomConnectionListener listener = mock(OnRoomConnectionListener.class);
@@ -514,7 +514,7 @@ public class NetworkIntegrationTest {
         verify(mockBleGuest).setRoomConnectionListener(listener);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void setGameConnectionListener_notifiedOnPartnerDisconnect() throws Exception {
         OnGameConnectionListener mockListener = mock(OnGameConnectionListener.class);
         networkManager.setGameConnectionListener(mockListener);
@@ -525,7 +525,7 @@ public class NetworkIntegrationTest {
         verify(mockListener).onGamePartnerDisconnected();
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void setNetworkEventListener_receivesEventsFromBleHostAndBleGuest() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
@@ -540,7 +540,7 @@ public class NetworkIntegrationTest {
 
     // --- Role Transitions ---
 
-    @Test
+    @Test(timeout = 5000)
     public void roleSwitchHostToGuest_cleansUpPreviousRoleCompletely() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");
@@ -554,7 +554,7 @@ public class NetworkIntegrationTest {
         verify(mockAdvertiser).stopAdvertising(any(android.bluetooth.le.AdvertiseCallback.class));
     }
 
-    @Test
+    @Test(timeout = 5000)
     @SuppressWarnings("unchecked")
     public void partnerDisconnectDuringGame_bothSidesNotifyGameConnectionListener() throws Exception {
         OnGameConnectionListener mockListener = mock(OnGameConnectionListener.class);
@@ -587,7 +587,7 @@ public class NetworkIntegrationTest {
 
     // --- End-to-End ---
 
-    @Test
+    @Test(timeout = 5000)
     @SuppressWarnings("unchecked")
     public void hostSelectGuest_thenGuestReceivesGuestAcceptedAction() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
@@ -611,7 +611,7 @@ public class NetworkIntegrationTest {
         assertEquals(GameAction.ActionType.GUEST_ACCEPTED, actionCaptor.getValue().type());
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void hostAndGuest_fullConnectionFlow_actionArrivesViaFetchNextAction() throws Exception {
         // Setup Bluetooth Server Mocking
         BluetoothGattServer mockServer = mock(BluetoothGattServer.class);
@@ -634,13 +634,18 @@ public class NetworkIntegrationTest {
         when(mockChar.getUuid()).thenReturn(NetworkManager.KITTY_CARDS_CHARACTERISTIC_UUID);
 
         android.bluetooth.BluetoothGattServerCallback callback = (android.bluetooth.BluetoothGattServerCallback) getInternalField(host, "gattServerCallback");
+        
+        // Trigger incoming data
         callback.onCharacteristicWriteRequest(mockGuestDevice, 1, mockChar, false, true, 0, new byte[6]);
+        
+        // Ensure any posted tasks are processed
+        idle();
 
         GameAction received = networkManager.fetchNextAction();
         assertEquals(action, received);
     }
 
-    @Test
+    @Test(timeout = 5000)
     public void hostCloseHostedRoom_guestReceivesRoomClosedAction() throws Exception {
         networkManager.hostMatch(mock(OnGuestConnectedListener.class));
         BleHost host = (BleHost) getInternalField(networkManager, "bleHost");

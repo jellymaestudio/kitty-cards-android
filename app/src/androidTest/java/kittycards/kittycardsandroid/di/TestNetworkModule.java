@@ -10,7 +10,7 @@ import kittycards.kittycardsandroid.components.IGameController;
 import kittycards.kittycardsandroid.logic.GameController;
 import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.components.IProtocolEngine;
-import kittycards.kittycardsandroid.FakeNetworkManager;
+import kittycards.kittycardsandroid.components.FakeNetworkManager;
 import kittycards.kittycardsandroid.network.ProtocolEngine;
 
 @Module

@@ -25,6 +25,7 @@ import javax.inject.Inject;
 
 import dagger.hilt.android.testing.HiltAndroidRule;
 import dagger.hilt.android.testing.HiltAndroidTest;
+import kittycards.kittycardsandroid.components.FakeNetworkManager;
 import kittycards.kittycardsandroid.components.IGameController;
 import kittycards.kittycardsandroid.model.Card;
 import kittycards.kittycardsandroid.model.GameColor;
@@ -58,7 +59,7 @@ public class NetworkIntegrationTest {
 
     // --- 1. Host-Flow ---
 
-    @Test
+    @Test(timeout = 10000)
     public void hostMatch_showsEmptyLobby_whenNoGuestConnected() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -68,7 +69,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void hostMatch_updatesGuestList_whenGuestConnects() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -78,7 +79,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void hostMatch_updatesGuestList_whenMultipleGuestsConnect() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -91,7 +92,7 @@ public class NetworkIntegrationTest {
 
     // --- 2. Guest-Flow / Discovery ---
 
-    @Test
+    @Test(timeout = 10000)
     public void joinMatch_showsEmptyDeviceList_whenNoHostFound() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -99,7 +100,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void joinMatch_updatesDeviceList_whenHostDiscovered() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -108,7 +109,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void joinMatch_updatesDeviceList_whenMultipleHostsDiscovered() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -121,7 +122,7 @@ public class NetworkIntegrationTest {
 
     // --- 3. Room-Verbindung ---
 
-    @Test
+    @Test(timeout = 10000)
     public void confirmRoom_stopsDiscovery_whenRoomSelected() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -131,7 +132,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void confirmRoom_showsConnectingState_afterSelection() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -144,7 +145,7 @@ public class NetworkIntegrationTest {
 
     // --- 4. Guest-Auswahl / Room-Abschluss ---
 
-    @Test
+    @Test(timeout = 10000)
     public void selectGuest_startsGameSession_whenHostConfirmsGuest() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -154,7 +155,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void closeRoom_stopsBroadcast_whenNoGuestConnected() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -163,7 +164,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void stopRoomDiscovery_hidesLobbyToNewGuests_duringMatch() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -175,7 +176,7 @@ public class NetworkIntegrationTest {
 
     // --- 5. Aktive Spielsitzung ---
 
-    @Test
+    @Test(timeout = 10000)
     public void sendGameChange_addsActionToSentActions_whenPlayerMakesMove() {
         Player p1 = new Player(0, "Host");
         Player p2 = new Player(1, "Guest");
@@ -197,7 +198,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void simulateIncomingAction_updatesGameState_whenActionReceived() {
         Player p1 = new Player(0, "Host");
         Player p2 = new Player(1, "Guest");
@@ -224,14 +225,14 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void simulateIncomingAction_rendersUiViaObserver_whenActionReceived() {
         // Verification is implicit in the logic above if we also check UI elements
     }
 
     // --- 6. Verbindungsabbruch während des Spiels ---
 
-    @Test
+    @Test(timeout = 10000)
     public void simulatePartnerDisconnected_showsDisconnectDialog_duringActiveGame() {
         Player p1 = new Player(0, "Host");
         Player p2 = new Player(1, "Guest");
@@ -245,14 +246,14 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void simulatePartnerDisconnected_stopsGameActionListener_whenTriggered() {
         // Implementation check
     }
 
     // --- 7. Allgemeine Netzwerk-Events ---
 
-    @Test
+    @Test(timeout = 10000)
     public void simulateNetworkEvent_showsErrorMessage_onErrorType() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.hostGameButton)).perform(click());
@@ -260,7 +261,7 @@ public class NetworkIntegrationTest {
         }
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void simulateNetworkEvent_showsWarningMessage_onWarningType() {
         try (ActivityScenario<LobbyActivity> scenario = ActivityScenario.launch(LobbyActivity.class)) {
             onView(withId(R.id.joinGameButton)).perform(click());
@@ -270,18 +271,18 @@ public class NetworkIntegrationTest {
 
     // --- 8. Disconnect / Cleanup ---
 
-    @Test
+    @Test(timeout = 10000)
     public void disconnect_clearsGuestAndDeviceLists_whenCalled() {
         fakeNetworkManager.simulateGuestConnected(new NetworkDevice("G", "1"));
         fakeNetworkManager.disconnect();
         assertTrue(fakeNetworkManager.getSentActions().isEmpty());
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void disconnect_resetsRoleToNotConnected_whenCalled() {
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void disconnect_clearsPendingActionQueue_whenCalled() {
         fakeNetworkManager.simulateIncomingAction(new GameAction(GameAction.ActionType.DRAW_CARD, new Card(GameColor.CYAN, 1)));
         fakeNetworkManager.disconnect();

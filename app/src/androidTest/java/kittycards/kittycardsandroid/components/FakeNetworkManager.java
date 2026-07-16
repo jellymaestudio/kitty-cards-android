@@ -1,10 +1,9 @@
-package kittycards.kittycardsandroid;
+package kittycards.kittycardsandroid.components;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import kittycards.kittycardsandroid.components.INetworkManager;
 import kittycards.kittycardsandroid.network.GameAction;
 import kittycards.kittycardsandroid.network.NetworkDevice;
 import kittycards.kittycardsandroid.network.OnDeviceFoundListener;
@@ -15,9 +14,6 @@ import kittycards.kittycardsandroid.network.Role;
 import kittycards.kittycardsandroid.network.event.NetworkEvent;
 import kittycards.kittycardsandroid.network.event.NetworkEventListener;
 
-/**
- * A robust fake implementation of INetworkManager for testing purposes.
- */
 public class FakeNetworkManager implements INetworkManager {
 
     private final LinkedBlockingQueue<GameAction> actionQueue = new LinkedBlockingQueue<>();
@@ -32,8 +28,6 @@ public class FakeNetworkManager implements INetworkManager {
 
     private final ArrayList<NetworkDevice> connectedGuests = new ArrayList<>();
     private final ArrayList<NetworkDevice> discoveredDevices = new ArrayList<>();
-
-    // --- Simulation API ---
 
     public void simulateIncomingAction(GameAction action) {
         actionQueue.add(action);
@@ -65,6 +59,28 @@ public class FakeNetworkManager implements INetworkManager {
         }
     }
 
+    public void simulateConnectionTimeout() {
+        simulateNetworkEvent(NetworkEvent.NetworkMessageType.ERROR, "Connection timeout");
+    }
+
+    public void simulateConnectionRejected() {
+        simulateNetworkEvent(NetworkEvent.NetworkMessageType.ERROR, "Connection rejected by host");
+    }
+
+    public void simulateLostConnection() {
+        role = Role.NOT_CONNECTED;
+        if (roomConnectionListener != null) {
+            roomConnectionListener.onRoomDisconnected();
+        }
+        if (gameConnectionListener != null) {
+            gameConnectionListener.onGamePartnerDisconnected();
+        }
+    }
+
+    public void simulateReconnect(Role newRole) {
+        this.role = newRole;
+    }
+
     public List<GameAction> getSentActions() {
         return new ArrayList<>(sentActions);
     }
@@ -72,8 +88,6 @@ public class FakeNetworkManager implements INetworkManager {
     public void clearSentActions() {
         sentActions.clear();
     }
-
-    // --- INetworkManager Implementation ---
 
     @Override
     public void hostMatch(OnGuestConnectedListener listener) {
@@ -96,8 +110,6 @@ public class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void selectGuest(NetworkDevice guest) {
-        // In the real implementation, this triggers a connection.
-        // For testing, we can simulate the result by adding actions to the queue later.
     }
 
     @Override
@@ -110,6 +122,9 @@ public class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void sendGameChange(GameAction action) {
+        if (role == Role.NOT_CONNECTED) {
+            throw new IllegalStateException("Not connected");
+        }
         sentActions.add(action);
     }
 
@@ -140,6 +155,9 @@ public class FakeNetworkManager implements INetworkManager {
 
     @Override
     public void stopRoomDiscovery() {
+    }
 
+    public Role getRole() {
+        return role;
     }
 }

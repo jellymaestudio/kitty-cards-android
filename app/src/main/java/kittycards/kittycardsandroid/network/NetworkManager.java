@@ -58,17 +58,32 @@ public class NetworkManager implements INetworkManager {
 
     @Inject
     public NetworkManager(@ApplicationContext Context context, IProtocolEngine protocolEngine) {
-        this(context, (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE), protocolEngine);
+        this.context = context.getApplicationContext();
+        this.protocolEngine = protocolEngine;
+        this.bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        this.bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
+        this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
+        this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
     }
 
     /** Constructor for testing only */
-    NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine) {
+    public NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine) {
         this.context = context.getApplicationContext();
         this.protocolEngine = protocolEngine;
         this.bluetoothManager = bluetoothManager;
         this.bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
         this.bleGuest = new BleGuest(this, this.context, this.bluetoothManager);
         this.bleHost = new BleHost(this, this.context, this.bluetoothManager);
+    }
+
+    /** Constructor for testing with seams */
+    public NetworkManager(Context context, BluetoothManager bluetoothManager, IProtocolEngine protocolEngine, BleHost bleHost, BleGuest bleGuest) {
+        this.context = context.getApplicationContext();
+        this.protocolEngine = protocolEngine;
+        this.bluetoothManager = bluetoothManager;
+        this.bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
+        this.bleHost = bleHost;
+        this.bleGuest = bleGuest;
     }
 
     // -------------------------------------------------------------------------
